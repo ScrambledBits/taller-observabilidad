@@ -1,0 +1,6 @@
+---
+promtail_user: "{{ observability_user }}"
+promtail_http_port: 9080
+promtail_config_dir: /etc/promtail
+promtail_positions_dir: "{{ data_base }}/promtail"
+promtail_url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"

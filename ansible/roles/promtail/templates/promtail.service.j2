@@ -1,0 +1,13 @@
+[Unit]
+Description=Promtail — Agente de envío de logs hacia Loki
+After=network.target
+
+[Service]
+Type=simple
+User={{ promtail_user }}
+ExecStart={{ install_dir }}/promtail -config.file={{ promtail_config_dir }}/promtail-config.yaml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
