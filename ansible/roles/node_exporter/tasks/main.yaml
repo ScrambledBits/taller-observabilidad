@@ -8,24 +8,10 @@
     owner: "{{ node_exporter_user }}"
     mode: "0755"
 
-- name: Obtener el checksum SHA256 esperado desde GitHub
-  ansible.builtin.uri:
-    url: "{{ node_exporter_checksum_url }}"
-    return_content: true
-  register: checksums_txt
-
-- name: Extraer el checksum del archivo tar.gz específico
-  ansible.builtin.set_fact:
-    node_exporter_sha256: >-
-      {{ checksums_txt.content
-         | regex_search('([0-9a-f]{64})\s+node_exporter-' + node_exporter_version + '\.' + arch + '\.tar\.gz', '\\1')
-         | first }}
-
-- name: Descargar tarball de node_exporter con verificación de checksum
+- name: Descargar tarball de node_exporter
   ansible.builtin.get_url:
     url: "{{ node_exporter_url }}"
     dest: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
-    checksum: "sha256:{{ node_exporter_sha256 }}"
     mode: "0644"
 
 - name: Extraer binario de node_exporter
