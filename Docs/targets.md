@@ -52,10 +52,10 @@ ssh -i "$KEY" \
     ubuntu@"$BACKEND_IP"
 ```
 
-> Si ya tenés la clave en el agente SSH (`ssh-add terraform/taller.pem`), podés usar el ProxyJump sin `-i`:
+> Si ya tienes la clave en el agente SSH (`ssh-add terraform/taller.pem`), puedes usar el ProxyJump sin `-i`:
 > `ssh -J ubuntu@<frontend_ip> ubuntu@<backend_ip>`
 
-Para conexiones repetidas durante el taller, agregá esto a `~/.ssh/config` (reemplazá las IPs y la ruta real de la clave):
+Para conexiones repetidas durante el taller, agrega esto a `~/.ssh/config` (reemplaza las IPs y la ruta real de la clave):
 
 ```
 Host webstack-frontend
@@ -122,7 +122,7 @@ aws ec2 describe-security-groups --group-ids "$SG_COMUN" \
 
 ## 1. Instalar node_exporter en el frontend
 
-Conectate al frontend y ejecutá los siguientes comandos:
+Conéctate al frontend y ejecuta los siguientes comandos:
 
 ```bash
 ssh -i terraform/taller.pem ubuntu@<frontend_public_ip>
@@ -191,7 +191,7 @@ ssh -i "$KEY" \
     ubuntu@<backend_private_ip>
 ```
 
-Una vez conectado, ejecutá los mismos comandos que en la sección 1:
+Una vez conectado, ejecuta los mismos comandos que en la sección 1:
 
 ```bash
 NODE_EXPORTER_VERSION="1.11.1"
@@ -244,7 +244,7 @@ El webstack instala nginx como reverse proxy pero **no expone métricas de Prome
 1. Habilitar `stub_status` en nginx (módulo estándar, ya incluido en el paquete `nginx`): expone contadores básicos de conexiones en una URL interna.
 2. Instalar `nginx-prometheus-exporter`: un proceso externo que lee `stub_status` y lo convierte al formato Prometheus, escuchando en el **puerto :9113**.
 
-> **Pre-requisito**: abrí el puerto :9113 en el SG `comun` del webstack antes de continuar (sección 0.5).
+> **Pre-requisito**: abre el puerto :9113 en el SG `comun` del webstack antes de continuar (sección 0.5).
 
 ### 3.1 Habilitar stub_status en nginx
 
@@ -386,7 +386,7 @@ def metrics():
     return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 ```
 
-Reiniciá el servicio:
+Reinicia el servicio:
 
 ```bash
 sudo systemctl restart flask-app
@@ -594,7 +594,7 @@ curl -s http://localhost:9080/ready
 
 ## 7. Verificar desde el nodo de monitoreo
 
-Obtenés la IP pública del nodo con:
+Obtén la IP pública del nodo con:
 
 ```bash
 cd <repo-observabilidad>/terraform && terraform output -raw monitoring_public_ip
@@ -602,7 +602,7 @@ cd <repo-observabilidad>/terraform && terraform output -raw monitoring_public_ip
 
 ### 7.1 Verificar alcance de los exporters
 
-SSH al nodo de monitoreo y probá cada exporter:
+Conéctate al nodo de monitoreo y prueba cada exporter:
 
 ```bash
 ssh -i terraform/taller-observabilidad-bootcamperu.pem ubuntu@<monitoring_public_ip>
@@ -623,7 +623,7 @@ curl -s "http://${FRONTEND_IP}:9113/metrics" | grep nginx | head -3
 curl -s "http://${BACKEND_IP}:5000/metrics" | head -5
 ```
 
-Si alguno no responde, verificá el Security Group del target en AWS Console o con:
+Si alguno no responde, verifica el Security Group del target en AWS Console o con:
 
 ```bash
 aws ec2 describe-security-groups --query 'SecurityGroups[*].{ID:GroupId,Name:GroupName,Ingress:IpPermissions}'
@@ -660,7 +660,7 @@ Queries de prueba:
 
 ## 8. Checklist final
 
-Antes de iniciar la sesión del taller, verificá que cada target tenga:
+Antes de iniciar la sesión del taller, verifica que cada target tenga:
 
 - [ ] `node_exporter` activo en `:9100` — `systemctl is-active node_exporter`
 - [ ] Prometheus puede alcanzar `:9100` desde el nodo de monitoreo

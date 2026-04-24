@@ -1,6 +1,6 @@
 # Quickstart — Taller de Observabilidad
 
-Guía paso-a-paso para los **alumnos**. Tiempo estimado en "happy path": ~20 min para tener el stack arriba (sin contar los TODO).
+Guía paso a paso para los **alumnos**. Tiempo estimado en "happy path": ~20 min para tener el stack arriba (sin contar los TODO).
 
 **Scope**: este repo solo despliega el nodo de monitoreo. Los targets (apps que vamos a monitorear) son externos y viven en el repo `webstack-bootcamp`. Ver `Docs/targets.md` para prepararlos.
 
@@ -64,7 +64,7 @@ make ping        # debe devolver pong antes de continuar
 make provision   # ejecuta ansible-playbook site.yaml (~5-8 min primera vez)
 ```
 
-Si algo falla, volvé a ejecutar `make provision` — los roles son idempotentes.
+Si algo falla, vuelve a ejecutar `make provision` — los roles son idempotentes.
 
 Para regenerar el inventario si la IP del nodo cambió:
 
@@ -80,9 +80,9 @@ make inventario
 make open
 ```
 
-Abrí en el browser:
+Abre en el browser:
 
-- **Grafana**: `http://<monitoring_public_ip>:3000` — login `admin / bootcamp2026` (cambialo en producción)
+- **Grafana**: `http://<monitoring_public_ip>:3000` — login `admin / bootcamp2026` (cámbialo en producción)
 - **Prometheus**: `http://<monitoring_public_ip>:9090/targets` — deberías ver:
   - `prometheus` UP (self-scrape)
   - `node-monitoring` UP (node_exporter del propio nodo)
@@ -91,7 +91,7 @@ Abrí en el browser:
 
 ---
 
-## 5. Live coding — completá los 10 TODO
+## 5. Live coding — completa los 10 TODO
 
 Esta es la parte pedagógica del taller. Cada TODO introduce un concepto clave del stack.
 
@@ -108,7 +108,7 @@ Esta es la parte pedagógica del taller. Cada TODO introduce un concepto clave d
 | 9 | `terraform/seguridad.tf` | Reglas de ingreso en SG para puertos `:9093` y `:3100` | 5' |
 | 10 | `terraform/user_data/monitoring.sh` | Discusión: Docker vs binarios en bootstrap | - |
 
-Tras cada TODO que modifique configuración del stack, volvé a aplicar:
+Tras cada TODO que modifique configuración del stack, vuelve a aplicar:
 
 ```bash
 make provision
@@ -139,7 +139,7 @@ Las métricas deben aparecer en Grafana a los ~30 segundos (dos scrape intervals
 
 ## 7. Al terminar
 
-**IMPORTANTE** — destruí la infraestructura para no consumir créditos AWS:
+**IMPORTANTE** — destruye la infraestructura para no consumir créditos AWS:
 
 ```bash
 make tf-destroy
@@ -155,9 +155,9 @@ Ver `Docs/troubleshooting.md` para el debugging completo.
 |---------|-------|
 | `terraform apply` falla con `UnauthorizedOperation` | `aws sts get-caller-identity` para verificar credenciales |
 | `Error: Failed to load remote state` | El stack de apps no está desplegado o el bucket S3 no es accesible |
-| Ansible `UNREACHABLE` al hacer `make ping` | Verificá `chmod 400 terraform/taller-observabilidad-bootcamperu.pem` |
+| Ansible `UNREACHABLE` al hacer `make ping` | Verifica `chmod 400 terraform/taller-observabilidad-bootcamperu.pem` |
 | `Permission denied (publickey)` | Clave sin permisos correctos o usuario SSH incorrecto |
-| Prometheus `node-external` / `apps` DOWN | node_exporter no instalado en los targets — seguí `Docs/targets.md` |
-| Grafana "Datasource not found" | UIDs esperados: `prom-taller` y `loki-taller` — reiniciá grafana-server |
+| Prometheus `node-external` / `apps` DOWN | node_exporter no instalado en los targets — sigue `Docs/targets.md` |
+| Grafana "Datasource not found" | UIDs esperados: `prom-taller` y `loki-taller` — reinicia grafana-server |
 | Loki no recibe logs desde targets | Promtail en los targets debe apuntar a `http://<monitoring_private_ip>:3100/loki/api/v1/push` |
-| Alertas no llegan | Configurar `alertmanager_webhook_url` en `ansible/group_vars/all.yaml` con un endpoint real |
+| Alertas no llegan | Configura `alertmanager_webhook_url` en `ansible/group_vars/all.yaml` con un endpoint real |
