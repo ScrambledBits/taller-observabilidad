@@ -14,5 +14,12 @@ data_base: /var/lib
 observability_user: observability
 observability_group: observability
 
-# Alertmanager — receptor webhook genérico (reemplazar con endpoint real para notificaciones)
+# Puertos compartidos entre roles — definidos aquí para evitar dependencias cruzadas entre roles
+loki_port: 3100
+alertmanager_port: 9093
+
+# Contraseña del administrador de Grafana — cambiar antes de un despliegue persistente
+grafana_admin_password: "bootcamp2026"
+
+# Receptor de notificaciones de Alertmanager — reemplazar con un endpoint HTTP real
 alertmanager_webhook_url: "http://localhost:5001/alertas"

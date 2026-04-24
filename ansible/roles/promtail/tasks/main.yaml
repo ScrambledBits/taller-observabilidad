@@ -9,13 +9,6 @@
     - "{{ promtail_config_dir }}"
     - "{{ promtail_positions_dir }}"
 
-# Necesario para que Promtail pueda leer el journal de systemd sin ser root
-- name: Agregar usuario {{ observability_user }} al grupo systemd-journal
-  ansible.builtin.user:
-    name: "{{ promtail_user }}"
-    groups: systemd-journal
-    append: true
-
 - name: Descargar binario de Promtail
   ansible.builtin.get_url:
     url: "{{ promtail_url }}"
@@ -61,7 +54,6 @@
     name: promtail
     state: started
     enabled: true
-    daemon_reload: true
 
 - name: Verificar endpoint /ready de Promtail
   ansible.builtin.uri:

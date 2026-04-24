@@ -23,13 +23,28 @@
       - net-tools
     state: present
 
+- name: Crear grupo de sistema para los servicios de observabilidad
+  ansible.builtin.group:
+    name: "{{ observability_group }}"
+    system: true
+    state: present
+
 - name: Crear usuario de sistema para los servicios de observabilidad
   ansible.builtin.user:
     name: "{{ observability_user }}"
+    group: "{{ observability_group }}"
     system: true
     shell: /usr/sbin/nologin
     create_home: false
     state: present
+
+# Necesario para node_exporter (--collector.systemd) y promtail (journal scraping).
+# Se hace aquí, antes de instalar ambos roles, para evitar race conditions.
+- name: Agregar usuario {{ observability_user }} al grupo systemd-journal
+  ansible.builtin.user:
+    name: "{{ observability_user }}"
+    groups: systemd-journal
+    append: true
 
 - name: Reiniciar si se actualizó el kernel
   ansible.builtin.reboot:

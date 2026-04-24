@@ -58,7 +58,6 @@
     name: loki
     state: started
     enabled: true
-    daemon_reload: true
 
 - name: Verificar endpoint /ready de Loki
   ansible.builtin.uri:

@@ -24,7 +24,7 @@ terraform {
   # usa: terraform init -backend-config="bucket=mi-bucket"
   backend "s3" {
     bucket       = "bootcamperu-tf-state"
-    key          = "taller-onservabilidad.tfstate"
+    key          = "taller-observabilidad.tfstate"
     region       = "us-east-1"
     use_lockfile = true
     encrypt      = true

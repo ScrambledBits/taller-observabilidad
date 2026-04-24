@@ -45,7 +45,6 @@
     name: node_exporter
     state: started
     enabled: true
-    daemon_reload: true
 
 - name: Verificar endpoint de métricas de node_exporter
   ansible.builtin.uri:

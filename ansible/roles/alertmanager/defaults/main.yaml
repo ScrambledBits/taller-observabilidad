@@ -1,7 +1,5 @@
 ---
 alertmanager_user: "{{ observability_user }}"
-alertmanager_port: 9093
 alertmanager_config_dir: /etc/alertmanager
 alertmanager_data_dir: "{{ data_base }}/alertmanager"
 alertmanager_url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.{{ arch }}.tar.gz"
-alertmanager_webhook_url: "http://localhost:5001/alertas"

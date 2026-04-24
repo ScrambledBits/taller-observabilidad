@@ -137,7 +137,7 @@
       "datasource": { "type": "loki", "uid": "loki-taller" },
       "targets": [
         {
-          "expr": "{job=\"systemd-journal\"} | line_format \"{{.unit}}: {{.message}}\"",
+          "expr": "{job=\"systemd-journal\"} | line_format \"{{.unit}}: {{.__line__}}\"",
           "legendFormat": "",
           "refId": "A"
         }

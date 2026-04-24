@@ -56,17 +56,17 @@ El `apply` también genera `ansible/inventario_terraform.yaml` automáticamente 
 
 ---
 
-## 3. Provisionar con Ansible
+## 3. Verificar conectividad y re-provisionar
+
+El `terraform apply` del paso anterior ya ejecutó Ansible automáticamente al terminar. Si necesitas volver a aplicar cambios de Ansible (por ejemplo, después de editar un TODO):
 
 ```bash
 cd ..
-make ping        # debe devolver pong antes de continuar
-make provision   # ejecuta ansible-playbook site.yaml (~5-8 min primera vez)
+make ping        # verifica que SSH sigue funcionando
+make provision   # vuelve a ejecutar ansible-playbook — los roles son idempotentes
 ```
 
-Si algo falla, vuelve a ejecutar `make provision` — los roles son idempotentes.
-
-Para regenerar el inventario si la IP del nodo cambió:
+Para regenerar el inventario si la IP del nodo cambió (por ejemplo, tras un stop/start de la instancia):
 
 ```bash
 make inventario
