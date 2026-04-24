@@ -26,34 +26,97 @@ El **backend no tiene IP pública**. Solo es accesible vía el frontend como bas
 
 ### Comandos SSH
 
-```bash
-# Frontend (acceso directo)
-ssh -i terraform/taller.pem ubuntu@<frontend_public_ip>
+Terraform genera los comandos SSH exactos como outputs. La forma más simple es usarlos directamente:
 
-# Backend (a través del frontend como ProxyJump)
-ssh -i terraform/taller.pem \
-    -o ProxyJump=ubuntu@<frontend_public_ip> \
-    ubuntu@<backend_private_ip>
+```bash
+# Frontend
+terraform output -raw frontend_ssh_command | bash
+
+# Backend — el output ya incluye el ProxyJump correcto
+terraform output -raw backend_ssh_command | bash
 ```
 
-Para evitar repetir el ProxyJump, podés agregar esto a `~/.ssh/config`:
+Si preferís construir el comando manualmente, **es importante usar `-o ProxyCommand=` en lugar de `-o ProxyJump=`**. ProxyJump no siempre propaga la clave `-i` al host de salto dependiendo de la versión de OpenSSH y del estado del agente SSH; ProxyCommand con `-W` sí lo hace de forma explícita:
+
+```bash
+KEY="/ruta/a/webstack-bootcamp/taller/terraform/taller.pem"
+FRONTEND_IP="<frontend_public_ip>"
+BACKEND_IP="<backend_private_ip>"
+
+# Frontend (acceso directo)
+ssh -i "$KEY" ubuntu@"$FRONTEND_IP"
+
+# Backend (ProxyCommand con clave explícita en ambos saltos)
+ssh -i "$KEY" \
+    -o ProxyCommand="ssh -W %h:%p -i '$KEY' ubuntu@$FRONTEND_IP" \
+    ubuntu@"$BACKEND_IP"
+```
+
+> Si ya tenés la clave en el agente SSH (`ssh-add terraform/taller.pem`), podés usar el ProxyJump sin `-i`:
+> `ssh -J ubuntu@<frontend_ip> ubuntu@<backend_ip>`
+
+Para conexiones repetidas durante el taller, agregá esto a `~/.ssh/config` (reemplazá las IPs y la ruta real de la clave):
 
 ```
 Host webstack-frontend
     HostName <frontend_public_ip>
     User ubuntu
-    IdentityFile /ruta/a/webstack-bootcamp/taller/terraform/taller.pem
+    IdentityFile /ruta/absoluta/webstack-bootcamp/taller/terraform/taller.pem
     StrictHostKeyChecking no
 
 Host webstack-backend
     HostName <backend_private_ip>
     User ubuntu
-    IdentityFile /ruta/a/webstack-bootcamp/taller/terraform/taller.pem
-    ProxyJump webstack-frontend
+    IdentityFile /ruta/absoluta/webstack-bootcamp/taller/terraform/taller.pem
+    ProxyCommand ssh -W %h:%p -i /ruta/absoluta/webstack-bootcamp/taller/terraform/taller.pem ubuntu@<frontend_public_ip>
     StrictHostKeyChecking no
 ```
 
 Con esto: `ssh webstack-frontend` y `ssh webstack-backend`.
+
+---
+
+## 0.5 Requisitos de Security Groups
+
+El webstack tiene tres Security Groups (`publico`, `privado`, `comun`). La siguiente tabla muestra qué puertos necesitamos para el monitoreo y cuáles ya están abiertos en el webstack base:
+
+| Puerto | Componente | SG afectado | Estado por defecto | Acción necesaria |
+|--------|-----------|-------------|-------------------|-----------------|
+| :22 | SSH | `comun` | **Abierto** — `0.0.0.0/0` | Nada |
+| :9100 | node_exporter | `comun` | **Abierto** — `monitoreo_cidr` (default `0.0.0.0/0`) | Nada |
+| :5000 | Flask `/metrics` | `privado` | **Abierto** — solo desde SG `publico` | Nada¹ |
+| :9113 | nginx-prometheus-exporter | `comun` | **CERRADO** | Abrir manualmente |
+
+> ¹ El nodo de monitoreo tiene el SG `publico` del webstack asignado (ver `instancias.tf` del repo de observabilidad), por lo que puede alcanzar el backend en :5000 directamente.
+
+### Abrir puerto :9113 manualmente
+
+El puerto :9113 (nginx-prometheus-exporter) no existe en el webstack base y hay que agregarlo al SG `comun` antes de continuar con la sección 3.
+
+**Opción A — AWS CLI** (recomendado, desde el directorio del webstack):
+
+```bash
+# Obtener el ID del SG comun
+SG_COMUN=$(terraform output -json security_group_ids | python3 -c "import json,sys; print(json.load(sys.stdin)['comun'])")
+printf "SG comun: %s\n" "$SG_COMUN"
+
+# Agregar la regla
+aws ec2 authorize-security-group-ingress \
+  --group-id "$SG_COMUN" \
+  --protocol tcp \
+  --port 9113 \
+  --cidr 0.0.0.0/0
+
+# Verificar
+aws ec2 describe-security-groups --group-ids "$SG_COMUN" \
+  --query 'SecurityGroups[0].IpPermissions[?FromPort==`9113`]'
+```
+
+**Opción B — Consola AWS**:
+1. EC2 → Security Groups → buscar el SG con nombre `taller_iac_bootcamperu_comun`
+2. Pestaña "Inbound rules" → "Edit inbound rules"
+3. Agregar regla: Type `Custom TCP`, Port `9113`, Source `0.0.0.0/0`
+4. Guardar
 
 ---
 
@@ -119,19 +182,69 @@ curl -s http://localhost:9100/metrics | head -5
 
 ## 2. Instalar node_exporter en el backend
 
-Conectate al backend (vía ProxyJump):
+Conectate al backend usando ProxyCommand (ver sección 0 para el comando completo):
 
 ```bash
-ssh -i terraform/taller.pem \
-    -o ProxyJump=ubuntu@<frontend_public_ip> \
+KEY="/ruta/a/webstack-bootcamp/taller/terraform/taller.pem"
+ssh -i "$KEY" \
+    -o ProxyCommand="ssh -W %h:%p -i '$KEY' ubuntu@<frontend_public_ip>" \
     ubuntu@<backend_private_ip>
 ```
 
-Ejecutá exactamente los mismos comandos de la sección anterior. La instalación es idéntica.
+Una vez conectado, ejecutá los mismos comandos que en la sección 1:
+
+```bash
+NODE_EXPORTER_VERSION="1.11.1"
+ARCH="linux-amd64"
+URL="https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/node_exporter-${NODE_EXPORTER_VERSION}.${ARCH}.tar.gz"
+CHECKSUM_URL="https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/sha256sums.txt"
+
+cd /tmp
+wget -q "${URL}" -O node_exporter.tar.gz
+wget -q "${CHECKSUM_URL}" -O sha256sums.txt
+grep "node_exporter-${NODE_EXPORTER_VERSION}.${ARCH}.tar.gz" sha256sums.txt | sha256sum --check
+
+tar xzf node_exporter.tar.gz
+sudo mv "node_exporter-${NODE_EXPORTER_VERSION}.${ARCH}/node_exporter" /usr/local/bin/
+sudo chmod 755 /usr/local/bin/node_exporter
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin node_exporter 2>/dev/null || true
+
+sudo tee /etc/systemd/system/node_exporter.service > /dev/null << 'EOF'
+[Unit]
+Description=Prometheus Node Exporter
+After=network.target
+
+[Service]
+Type=simple
+User=node_exporter
+ExecStart=/usr/local/bin/node_exporter \
+  --web.listen-address=":9100" \
+  --collector.systemd \
+  --collector.processes
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now node_exporter
+
+systemctl is-active node_exporter
+curl -s http://localhost:9100/metrics | head -5
+```
 
 ---
 
 ## 3. Configurar nginx stub_status y nginx-prometheus-exporter en el frontend
+
+El webstack instala nginx como reverse proxy pero **no expone métricas de Prometheus**. Para monitorearlo necesitamos dos pasos:
+
+1. Habilitar `stub_status` en nginx (módulo estándar, ya incluido en el paquete `nginx`): expone contadores básicos de conexiones en una URL interna.
+2. Instalar `nginx-prometheus-exporter`: un proceso externo que lee `stub_status` y lo convierte al formato Prometheus, escuchando en el **puerto :9113**.
+
+> **Pre-requisito**: abrí el puerto :9113 en el SG `comun` del webstack antes de continuar (sección 0.5).
 
 ### 3.1 Habilitar stub_status en nginx
 
