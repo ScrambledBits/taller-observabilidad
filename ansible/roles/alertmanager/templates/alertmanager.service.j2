@@ -5,10 +5,18 @@ After=network.target
 [Service]
 Type=simple
 User={{ alertmanager_user }}
+
 ExecStart={{ install_dir }}/alertmanager \
   --config.file={{ alertmanager_config_dir }}/alertmanager.yml \
+  # --storage.path: directorio donde Alertmanager persiste:
+  #   - silences: alertas que el operador silenció manualmente desde la UI
+  #   - nflog (notification log): historial de qué notificaciones se enviaron y cuándo
+  # Sin persistencia, cada reinicio de Alertmanager olvidaría los silences.
   --storage.path={{ alertmanager_data_dir }} \
   --web.listen-address=":{{ alertmanager_port }}"
+
+# Al igual que Prometheus, Alertmanager soporta SIGHUP para recargar configuración.
+# Esto permite cambiar las rutas de alertas y receptores sin perder los silences activos.
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s

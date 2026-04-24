@@ -1,42 +1,91 @@
 # TODO(taller): #2 — scrape_configs con file_sd para service discovery dinámico
+#
+# Este archivo es la configuración principal de Prometheus. Controla:
+#   - Con qué frecuencia recolecta métricas (scrape_interval)
+#   - Con qué frecuencia evalúa las reglas de alerta (evaluation_interval)
+#   - De dónde recolecta métricas (scrape_configs)
+#   - Dónde envía las alertas (alerting)
+#   - Qué reglas de alerta carga (rule_files)
+#
+# El archivo se renderiza como plantilla Jinja2: cada {{ variable }} se reemplaza
+# con el valor definido en ansible/roles/prometheus/defaults/main.yaml
+# o en ansible/group_vars/all.yaml antes de copiarse al servidor.
+
 global:
+  # scrape_interval: cada cuánto Prometheus "raspa" (consulta) cada target.
+  # 15s es un buen balance entre resolución y carga. Para producción con muchos
+  # targets podrías subir a 30s o 60s para reducir el volumen de datos.
   scrape_interval: {{ prometheus_scrape_interval }}
+
+  # evaluation_interval: cada cuánto evalúa las reglas de alerta en rule_files.
+  # Debe ser igual o múltiplo de scrape_interval para evitar falsos positivos.
   evaluation_interval: {{ prometheus_evaluation_interval }}
+
+  # external_labels: etiquetas que se agregan a TODAS las métricas y alertas de
+  # esta instancia de Prometheus. Son útiles cuando tienes múltiples instancias
+  # (p. ej., prod vs staging) y necesitas distinguirlas en Grafana o en Alertmanager.
   external_labels:
     monitor: 'taller-bootcamperu'
     entorno: 'workshop'
 
+# alerting: dónde enviar las alertas que disparen las reglas.
+# Alertmanager recibe las alertas y decide cómo notificar (email, Slack, webhook, etc.)
 alerting:
   alertmanagers:
     - static_configs:
+        # Alertmanager corre en el mismo nodo que Prometheus, por eso localhost.
+        # En producción podrías tener Alertmanager en otro servidor.
         - targets:
             - 'localhost:9093'
 
+# rule_files: archivos con las reglas de alerta (PromQL + condiciones).
+# Prometheus los evalúa con la frecuencia de evaluation_interval.
+# El patrón *.yaml carga todos los archivos que coloquemos en esa carpeta.
 rule_files:
   - '{{ prometheus_config_dir }}/rules/*.yaml'
 
 scrape_configs:
-  # Auto-monitoreo de Prometheus
+  # --- TARGET 1: Prometheus se monitorea a sí mismo ---
+  # Prometheus expone sus propias métricas en /metrics.
+  # Esto permite ver si el propio Prometheus tiene problemas (p. ej., lentitud en scrapes).
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # node_exporter en el propio nodo de monitoreo
+  # --- TARGET 2: node_exporter del nodo de monitoreo ---
+  # node_exporter expone métricas del sistema operativo: CPU, RAM, disco, red.
+  # Este job monitorea el propio nodo donde corre el stack de observabilidad.
   - job_name: 'node-monitoring'
     static_configs:
       - targets: ['localhost:9100']
+    # relabel_configs: modifica las etiquetas de las métricas antes de almacenarlas.
+    # Aquí sobreescribimos la etiqueta "instance" para que muestre el hostname
+    # en lugar de "localhost:9100", que sería ambiguo si hubiera varios nodos.
     relabel_configs:
       - target_label: instance
         replacement: "{{ ansible_hostname }}"
 
-  # Targets externos de infraestructura vía file_sd (se recargan automáticamente cada 30s)
+  # --- TARGET 3: file_sd (file-based Service Discovery) para infraestructura ---
+  # TODO(taller): completar este bloque junto con el archivo targets_infra.yaml.j2
+  #
+  # ¿Qué es file_sd?
+  # En lugar de listar los targets directamente aquí (static_configs), apuntamos
+  # a un ARCHIVO que contiene la lista de targets. Ventajas:
+  #   1. Puedes agregar/quitar targets EDITANDO EL ARCHIVO sin recargar Prometheus
+  #   2. Otros sistemas (Ansible, scripts) pueden actualizar ese archivo automáticamente
+  #   3. La configuración principal de Prometheus queda limpia y separada de los datos
+  #
+  # refresh_interval: cada cuánto Prometheus lee el archivo para detectar cambios.
+  # No necesita reiniciarse — simplemente vuelve a leer el archivo.
   - job_name: 'node-external'
     file_sd_configs:
       - files:
           - '{{ prometheus_config_dir }}/targets_infra.yaml'
         refresh_interval: 30s
 
-  # Targets de aplicaciones vía file_sd
+  # --- TARGET 4: file_sd para aplicaciones ---
+  # Mismo concepto que el anterior, pero para targets de aplicaciones
+  # (Flask, nginx-exporter, etc.) que exponen métricas en puertos específicos.
   - job_name: 'apps'
     file_sd_configs:
       - files:

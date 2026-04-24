@@ -1,4 +1,17 @@
 ---
+# Alertmanager recibe alertas disparadas por Prometheus y decide qué hacer con ellas:
+# agruparlas, silenciarlas, inhibirlas, o enviarlas a uno o más receptores
+# (webhook, email, Slack, PagerDuty, etc.).
+#
+# Separar el alerting de Prometheus tiene una razón importante: Prometheus puede
+# haber múltiples instancias (alta disponibilidad), pero solo debes recibir
+# una notificación, no una por instancia. Alertmanager se encarga de la deduplicación.
+#
+# Directorios:
+#   /etc/alertmanager/      → archivo de configuración (alertmanager.yml)
+#   /var/lib/alertmanager/  → datos persistidos: silences (alertas silenciadas),
+#                             notification log (historial de qué se envió y cuándo)
+
 - name: Crear directorios de Alertmanager
   ansible.builtin.file:
     path: "{{ item }}"
@@ -22,6 +35,9 @@
     remote_src: true
     creates: "/tmp/alertmanager-{{ alertmanager_version }}.{{ arch }}/alertmanager"
 
+# Alertmanager incluye dos binarios:
+#   - alertmanager: el servidor
+#   - amtool: CLI para gestionar alertmanager (validar config, crear silences, etc.)
 - name: Instalar binarios alertmanager y amtool
   ansible.builtin.copy:
     src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ arch }}/{{ item }}"
@@ -35,6 +51,9 @@
     - amtool
   notify: reiniciar alertmanager
 
+# Permisos 0640 (no 0644) porque el config puede contener credenciales
+# (tokens de Slack, contraseñas de SMTP, etc.). El grupo "observability"
+# puede leerlo (el servicio corre como ese usuario), pero otros usuarios no.
 - name: Desplegar configuración de Alertmanager
   ansible.builtin.template:
     src: alertmanager.yml.j2
@@ -59,6 +78,10 @@
     state: started
     enabled: true
 
+# amtool check-config: valida la sintaxis del alertmanager.yml.
+# Al igual que promtool para Prometheus, este paso detecta errores ANTES de que
+# Alertmanager intente recargar un archivo inválido.
+# changed_when: false → este comando solo verifica, nunca cambia el estado del sistema.
 - name: Validar configuración de Alertmanager con amtool
   ansible.builtin.command:
     cmd: "{{ install_dir }}/amtool check-config {{ alertmanager_config_dir }}/alertmanager.yml"

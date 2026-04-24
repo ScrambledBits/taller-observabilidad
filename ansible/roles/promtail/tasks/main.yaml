@@ -1,4 +1,16 @@
 ---
+# Promtail es el agente de recolección de logs. Lee logs del servidor donde corre
+# y los envía a Loki en batches comprimidos.
+#
+# En este taller, Promtail corre en el nodo de monitoreo y envía sus propios logs
+# (journal de systemd + syslog) a Loki local. En un entorno real, también correrías
+# Promtail en los servidores de aplicaciones (frontend, backend) para centralizar
+# todos los logs en un solo Loki.
+#
+# Directorios:
+#   /etc/promtail/         → archivo de configuración
+#   /var/lib/promtail/     → positions.yaml (rastrea hasta dónde llegó en cada log)
+
 - name: Crear directorios de Promtail
   ansible.builtin.file:
     path: "{{ item }}"
@@ -9,6 +21,8 @@
     - "{{ promtail_config_dir }}"
     - "{{ promtail_positions_dir }}"
 
+# Promtail se distribuye en el mismo repositorio de GitHub que Loki.
+# Siempre deben usar la misma versión para compatibilidad de protocolo.
 - name: Descargar binario de Promtail
   ansible.builtin.get_url:
     url: "{{ promtail_url }}"
@@ -55,6 +69,7 @@
     state: started
     enabled: true
 
+# /ready: endpoint de Promtail que responde "Ready" cuando está procesando logs.
 - name: Verificar endpoint /ready de Promtail
   ansible.builtin.uri:
     url: "http://localhost:{{ promtail_http_port }}/ready"

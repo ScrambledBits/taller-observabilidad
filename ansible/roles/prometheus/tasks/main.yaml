@@ -1,10 +1,22 @@
 ---
+# Prometheus es el motor central de métricas del stack de observabilidad.
+# Recolecta métricas de todos los targets, las almacena en su base de datos TSDB
+# (Time Series Database) y evalúa las reglas de alerta.
+#
+# Directorios creados:
+#   /etc/prometheus/          → archivos de configuración (prometheus.yml, reglas, targets)
+#   /etc/prometheus/rules/    → archivos de reglas de alerta (.yaml)
+#   /var/lib/prometheus/      → datos TSDB (series de tiempo almacenadas)
+#
+# Separar config de datos es buena práctica: facilita hacer backup solo de los datos
+# o solo de la config, y respetar los permisos correctos.
 - name: Crear directorios de Prometheus
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: "{{ prometheus_user }}"
     mode: "0755"
+  # loop: itera sobre la lista de directorios. {{ item }} toma el valor de cada elemento.
   loop:
     - "{{ prometheus_config_dir }}"
     - "{{ prometheus_config_dir }}/rules"
@@ -23,6 +35,10 @@
     remote_src: true
     creates: "/tmp/prometheus-{{ prometheus_version }}.{{ arch }}/prometheus"
 
+# Prometheus incluye dos binarios:
+#   - prometheus: el servidor principal
+#   - promtool: herramienta de línea de comandos para validar configs y reglas
+# Instalamos ambos porque los usaremos más adelante para validar la configuración.
 - name: Instalar binarios prometheus y promtool
   ansible.builtin.copy:
     src: "/tmp/prometheus-{{ prometheus_version }}.{{ arch }}/{{ item }}"
@@ -36,6 +52,15 @@
     - promtool
   notify: reiniciar prometheus
 
+# RELOAD vs RESTART:
+# - restart: detiene y vuelve a arrancar Prometheus (brecha de datos ~1-2s)
+# - reload (SIGHUP): Prometheus recarga la configuración SIN reiniciarse.
+#   No hay pérdida de datos, no hay brecha en las métricas.
+#   SIGHUP es la señal estándar de Unix para "recargar configuración".
+#   Solo funciona porque el unit file tiene --web.enable-lifecycle y ExecReload.
+#
+# Usamos "recargar" (no "reiniciar") para cambios de configuración.
+# Usamos "reiniciar" solo cuando cambia el binario.
 - name: Desplegar configuración de Prometheus
   ansible.builtin.template:
     src: prometheus.yml.j2
@@ -60,6 +85,10 @@
     mode: "0644"
   notify: recargar prometheus
 
+# copy (sin template): copia el archivo tal cual, sin procesar variables {{ }}.
+# Usamos copy para alerts.yaml porque es YAML estático (no usa variables de Ansible).
+# Las variables {{ $labels.instance }} que aparecen en ese archivo son plantillas
+# de Prometheus (Go templates), no de Ansible, y no deben ser procesadas aquí.
 - name: Desplegar reglas de alertas
   ansible.builtin.copy:
     src: rules/alerts.yaml
@@ -83,11 +112,17 @@
     state: started
     enabled: true
 
+# promtool check config: valida la sintaxis del prometheus.yml y de los rule_files.
+# Si hay un error de sintaxis, este comando falla y el playbook se detiene ANTES
+# de que Prometheus intente recargar un archivo inválido (lo que causaría que se caiga).
+# changed_when: false → esta tarea solo verifica, nunca "cambia" el estado del servidor.
 - name: Validar configuración de Prometheus con promtool
   ansible.builtin.command:
     cmd: "{{ install_dir }}/promtool check config {{ prometheus_config_dir }}/prometheus.yml"
   changed_when: false
 
+# /-/ready: endpoint HTTP de Prometheus que responde 200 cuando está listo para recibir
+# tráfico. Prometheus puede tardar unos segundos en cargar las series históricas.
 - name: Verificar endpoint /ready de Prometheus
   ansible.builtin.uri:
     url: "http://localhost:{{ prometheus_port }}/-/ready"

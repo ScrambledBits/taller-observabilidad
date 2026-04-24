@@ -1,8 +1,23 @@
 # TODO(taller): #5 — configuración de almacenamiento + política de retención
+#
+# Loki es el sistema de aggregación de logs del taller. A diferencia de
+# Elasticsearch o Splunk, Loki NO indexa el contenido de los logs — solo indexa
+# las ETIQUETAS (labels). Esto lo hace muy económico en almacenamiento pero
+# requiere que los logs tengan buenas etiquetas para poder filtrarlos.
+#
+# En producción, Loki puede usar S3, GCS o Azure Blob para almacenamiento.
+# En este taller usamos almacenamiento en disco local (filesystem) por simplicidad.
+
+# auth_enabled: en producción se usa "true" junto con un proxy de autenticación.
+# Para el taller, "false" significa que cualquiera que alcance el puerto 3100
+# puede escribir y leer logs. Aceptable en entornos controlados de aprendizaje.
 auth_enabled: false
 
 server:
+  # Puerto HTTP para la API REST de Loki (recibir logs, consultar, etc.)
   http_listen_port: {{ loki_port }}
+  # Puerto gRPC para comunicación interna entre componentes de Loki en cluster.
+  # En single-node (este taller) no se usa activamente, pero debe estar definido.
   grpc_listen_port: {{ loki_grpc_port }}
   log_level: info
 
@@ -10,44 +25,79 @@ common:
   instance_addr: 127.0.0.1
   path_prefix: {{ loki_data_dir }}
   storage:
+    # filesystem: almacena los datos en disco local.
+    # Para producción: reemplazar por storage.s3, storage.gcs, etc.
+    # Ventaja del filesystem en taller: sin dependencias externas, fácil de inspeccionar.
     filesystem:
-      chunks_directory: {{ loki_data_dir }}/chunks
-      rules_directory: {{ loki_data_dir }}/rules
+      chunks_directory: {{ loki_data_dir }}/chunks   # fragmentos de logs comprimidos
+      rules_directory: {{ loki_data_dir }}/rules     # reglas de métricas de Loki (opcional)
+  # replication_factor: cuántas copias de cada chunk se guardan.
+  # 1 = sin replicación, adecuado para single-node. En cluster se usa 2 o 3.
   replication_factor: 1
   ring:
+    # kvstore: almacén de estado distribuido para coordinar los componentes de Loki.
+    # En single-node, "inmemory" es suficiente (no persiste al reiniciar, pero tampoco
+    # necesita persistir en single-node).
     kvstore:
       store: inmemory
 
 query_range:
   results_cache:
     cache:
+      # Cache en memoria para resultados de consultas recientes.
+      # Acelera dashboards de Grafana cuando los usuarios actualizan frecuentemente.
       embedded_cache:
         enabled: true
-        max_size_mb: 100
+        max_size_mb: 100  # límite de RAM para el caché de consultas
 
 schema_config:
   configs:
+    # schema_config define CÓMO almacena Loki los datos.
+    # "from": desde qué fecha aplica esta configuración.
+    # Puedes tener múltiples configuraciones para migrar entre esquemas.
     - from: 2024-01-01
+      # store: "tsdb" es el backend de índice de nueva generación (desde Loki 2.8).
+      # Reemplaza a boltdb-shipper. Más eficiente y con mejor soporte de retención.
       store: tsdb
+      # object_store: "filesystem" = disco local. Alternativas: s3, gcs, azure, etc.
       object_store: filesystem
+      # schema: v13 es la versión actual del esquema de índice para TSDB.
+      # Más eficiente que v11 o v12. No cambiar a menos que haya una razón específica.
       schema: v13
       index:
-        prefix: index_
-        period: 24h
+        prefix: index_   # prefijo para los archivos de índice
+        period: 24h      # un archivo de índice por día — facilita la retención
 
 limits_config:
+  # retention_period: cuánto tiempo se conservan los logs antes de eliminarlos.
+  # 168h = 7 días. Para el taller es suficiente. En producción, 30d o más.
+  # El compactor (sección inferior) es quien ejecuta la eliminación real.
   retention_period: {{ loki_retention_period }}
+  # ingestion_rate_mb: máximo de MB/s que Loki acepta de un solo cliente.
+  # Protege contra un cliente que envíe logs a ráfagas y sature el sistema.
   ingestion_rate_mb: 4
+  # ingestion_burst_size_mb: permite ráfagas breves por encima del límite.
   ingestion_burst_size_mb: 6
+  # max_entries_limit_per_query: límite de líneas por consulta desde Grafana.
+  # Evita consultas que devuelvan millones de líneas y saturen el browser.
   max_entries_limit_per_query: 5000
 
 compactor:
+  # El compactor es el proceso que ejecuta la retención: busca chunks más viejos
+  # que retention_period y los elimina del disco.
   working_directory: {{ loki_data_dir }}/retention
+  # Cada cuánto corre el compactor para comprimir y limpiar datos viejos.
   compaction_interval: 10m
+  # retention_enabled: sin este flag, retention_period no tiene efecto.
   retention_enabled: true
+  # retention_delete_delay: espera 2h después de marcar un chunk para borrar.
+  # Da tiempo a que las consultas en vuelo terminen antes de eliminar los datos.
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
   delete_request_store: filesystem
 
 ruler:
+  # Si defines reglas de alerta en Loki (para alertar sobre patrones en logs),
+  # el ruler las envía a Alertmanager. En este taller las alertas vienen de
+  # Prometheus, pero esta configuración habilita la posibilidad.
   alertmanager_url: http://localhost:{{ alertmanager_port }}

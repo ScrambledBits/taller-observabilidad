@@ -1,13 +1,34 @@
 # TODO(taller): #3 — targets de infraestructura con IPs inyectadas desde Terraform
+#
+# Este archivo define la lista de hosts donde Prometheus recolectará métricas
+# de infraestructura (CPU, RAM, disco) usando node_exporter.
+#
+# FORMATO DE LOS TARGETS:
+#   Cada entrada es "ip:puerto". El puerto 9100 es el puerto estándar de node_exporter.
+#   Si node_exporter escucha en otro puerto, cámbialo aquí.
+#
+# ¿POR QUÉ LABELS?
+#   Las etiquetas (labels) se agregan a TODAS las métricas de ese target.
+#   Sirven para filtrar y agrupar en queries PromQL. Por ejemplo:
+#     node_cpu_seconds_total{instance="frontend"}  → CPU solo del frontend
+#     node_cpu_seconds_total{entorno="workshop"}    → todos los nodos del taller
+#
+# ¿DE DÓNDE VIENEN LAS IPs?
+#   {{ frontend_target_ip }} y {{ backend_target_ip }} son variables que Ansible
+#   inyecta desde el inventario, el cual a su vez fue generado por Terraform al
+#   leer las IPs del stack de apps (remote state de S3).
+#   Ver: terraform/aprovisionamiento.tf y ansible/inventario_terraform.yaml
+
 # node_exporter en el frontend (webstack) — requiere node_exporter instalado en el target
+# Ver Docs/targets.md para instrucciones de instalación manual
 - targets:
     - "{{ frontend_target_ip }}:9100"
   labels:
-    job: node-external
-    instance: frontend
-    entorno: workshop
+    job: node-external       # nombre del job en Prometheus (aparece en /targets)
+    instance: frontend       # identifica este host en queries PromQL
+    entorno: workshop        # útil si gestionas múltiples entornos
 
-# node_exporter en el backend (webstack) — requiere node_exporter instalado en el target
+# node_exporter en el backend (webstack)
 - targets:
     - "{{ backend_target_ip }}:9100"
   labels:

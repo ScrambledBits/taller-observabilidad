@@ -1,18 +1,79 @@
 # TODO(taller): #8 — Regla de alerta HighCPU y otras alertas base
+#
+# ANATOMÍA DE UNA REGLA DE ALERTA EN PROMETHEUS:
+#
+#   alert:       Nombre de la alerta. Aparece en Alertmanager y notificaciones.
+#   expr:        Expresión PromQL que Prometheus evalúa cada `evaluation_interval`.
+#                Si el resultado es un valor > 0 (o simplemente existe), la alerta
+#                pasa a estado "pending".
+#   for:         Tiempo que la condición debe mantenerse verdadera antes de que la
+#                alerta pase de "pending" a "firing". Evita alertas por picos breves.
+#   labels:      Etiquetas que se agregan a la alerta (p. ej., severity).
+#                Alertmanager usa estas etiquetas para el routing (¿a quién notificar?).
+#   annotations: Texto legible por humanos. NO se usan para routing.
+#                summary: descripción corta para el asunto de la notificación.
+#                description: detalle con valores del momento del disparo.
+#
+# VARIABLES DISPONIBLES EN ANNOTATIONS:
+#   {{ $labels.instance }}     → etiqueta "instance" de la serie que disparó la alerta
+#   {{ $labels.job }}          → etiqueta "job"
+#   {{ $value }}               → valor numérico que disparó la expresión
+#   {{ $value | humanizePercentage }} → formatea 0.85 como "85%"
+
 groups:
   - name: alertas_observabilidad
     rules:
+
+      # -----------------------------------------------------------------------
+      # ALERTA: HighCPU
+      # -----------------------------------------------------------------------
+      # EXPRESIÓN PromQL explicada paso a paso:
+      #
+      #   node_cpu_seconds_total{mode="idle"}
+      #   → Contador acumulado de segundos que la CPU ha estado inactiva (idle).
+      #     Es un contador que solo crece. Por eso usamos rate() para convertirlo
+      #     en una tasa por segundo.
+      #
+      #   rate(node_cpu_seconds_total{mode="idle"}[5m])
+      #   → Tasa de crecimiento del contador en los últimos 5 minutos.
+      #     El resultado es la FRACCIÓN de tiempo en idle por CPU-core.
+      #     Valor entre 0 (ocupada) y 1 (completamente inactiva).
+      #
+      #   avg by(instance)(...)
+      #   → Promedia todos los cores de la misma instancia.
+      #     Una máquina con 4 cores dará un solo valor promedio.
+      #     Sin esto, la alerta dispararía una vez por cada CPU-core.
+      #
+      #   1 - avg by(instance)(...)
+      #   → Invierte: ahora 0 = completamente inactiva, 1 = 100% ocupada.
+      #     Es el porcentaje de CPU en USO.
+      #
+      #   ... > 0.8
+      #   → La alerta se activa cuando la CPU está más del 80% ocupada.
       - alert: HighCPU
         expr: (1 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.8
+        # for: la CPU debe estar >80% durante AL MENOS 2 minutos seguidos.
+        # Sin este `for`, una ráfaga de CPU de 15 segundos dispararía la alerta.
         for: 2m
         labels:
+          # severity: Alertmanager usa esta etiqueta para el routing.
+          # "warning" = notificar pero no despertar a nadie a las 3am.
+          # "critical" = despertar al oncall inmediatamente.
           severity: warning
         annotations:
           summary: "Alta carga de CPU en {{ $labels.instance }}"
+          # description incluye el valor actual para dar contexto en la notificación.
           description: "CPU > 80% durante más de 2 minutos en {{ $labels.instance }} (actual: {{ $value | humanizePercentage }})"
 
+      # -----------------------------------------------------------------------
+      # ALERTA: InstanciaInaccesible
+      # -----------------------------------------------------------------------
+      # La métrica `up` la genera el propio Prometheus:
+      #   up == 1 → el último scrape del target fue exitoso
+      #   up == 0 → el último scrape falló (target caído, puerto cerrado, timeout)
       - alert: InstanciaInaccesible
         expr: up == 0
+        # Solo 1 minuto de `for` porque si un target no responde 1 min, es un problema real.
         for: 1m
         labels:
           severity: critical
@@ -20,6 +81,16 @@ groups:
           summary: "Instancia caída: {{ $labels.instance }}"
           description: "{{ $labels.job }}/{{ $labels.instance }} lleva más de 1 minuto sin responder."
 
+      # -----------------------------------------------------------------------
+      # ALERTA: AltaMemoria
+      # -----------------------------------------------------------------------
+      # node_memory_MemAvailable_bytes: memoria disponible para nuevas aplicaciones.
+      # Incluye buffers y caché reutilizable. Más preciso que MemFree para alertas.
+      #
+      # node_memory_MemTotal_bytes: memoria RAM total del sistema.
+      #
+      # Fórmula: 1 - (disponible / total) = fracción de memoria en uso.
+      # > 0.9 = más del 90% de la RAM está en uso.
       - alert: AltaMemoria
         expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
         for: 2m

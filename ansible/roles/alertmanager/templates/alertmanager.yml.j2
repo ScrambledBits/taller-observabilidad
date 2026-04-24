@@ -1,33 +1,91 @@
 # TODO(taller): #7 — configuración de rutas + receptor de notificaciones
+#
+# Alertmanager recibe alertas de Prometheus y decide:
+#   1. CÓMO agruparlas (para no recibir 100 emails por 100 instancias caídas)
+#   2. A QUIÉN enviarselas (según el tipo/severidad de la alerta)
+#   3. CUÁNDO repetir la notificación si la alerta sigue activa
+#
 # Por defecto usa un webhook genérico. Para usar Slack, PagerDuty, email, etc.,
 # reemplazar el bloque 'webhook_configs' con el receptor correspondiente.
 # Referencia: https://prometheus.io/docs/alerting/latest/configuration/
+#
+# ÁRBOL DE ROUTING:
+#   Alertmanager procesa cada alerta bajando por el árbol de rutas (routes).
+#   Empieza por la raíz (receiver por defecto) y baja por las rutas hijo.
+#   La primera ruta que coincida con los labels de la alerta gana.
+#   Si ninguna coincide, usa el receiver de la raíz.
+
 global:
+  # resolve_timeout: cuánto tiempo espera Alertmanager para declarar una alerta
+  # como "resuelta" una vez que Prometheus deja de enviarla.
+  # Si una alerta desaparece por 5 minutos, se considera resuelta y se envía
+  # una notificación de "recovered".
   resolve_timeout: 5m
 
 route:
+  # group_by: agrupa alertas que tienen los mismos valores en estas etiquetas.
+  # Ejemplo: si caen 5 instancias del mismo job, en vez de 5 notificaciones,
+  # recibes 1 notificación con todas las instancias afectadas.
   group_by: ['alertname', 'instance', 'severity']
+
+  # group_wait: cuánto tiempo espera Alertmanager para acumular alertas del mismo
+  # grupo antes de enviar la primera notificación.
+  # Útil para cuando un despliegue falla en cascada: espera 30s para ver si son
+  # varias instancias y las agrupa en una sola notificación.
   group_wait: 30s
+
+  # group_interval: si ya se envió una notificación para un grupo y llegan alertas
+  # nuevas al mismo grupo, espera group_interval antes de enviar la actualización.
   group_interval: 5m
+
+  # repeat_interval: si la alerta sigue activa y no hay cambios, reenvía la
+  # notificación cada repeat_interval. Evita que el oncall "olvide" una alerta.
   repeat_interval: 4h
+
   receiver: 'webhook-notificaciones'
+
+  # routes: rutas hijo. Permiten enviar diferentes alertas a diferentes receptores.
+  # Aquí mandamos las alertas "critical" al mismo receptor pero con repeat más frecuente.
   routes:
     - match:
-        severity: critical
+        severity: critical    # filtra alertas con label severity=critical
       receiver: 'webhook-notificaciones'
-      repeat_interval: 1h
+      repeat_interval: 1h    # reenviar cada hora si sigue activa (más urgente que warning)
 
 receivers:
-  # Receptor webhook genérico — envía JSON a cualquier endpoint HTTP.
-  # Reemplazar la URL con el endpoint real del sistema de notificaciones.
+  # Receptor webhook genérico: envía un POST JSON a la URL configurada.
+  # El JSON contiene todos los detalles de las alertas del grupo.
+  # Sirve para integrar con cualquier sistema: Slack, PagerDuty, un script propio, etc.
+  #
+  # Formato del payload enviado (simplificado):
+  # {
+  #   "receiver": "webhook-notificaciones",
+  #   "status": "firing",           # o "resolved"
+  #   "alerts": [
+  #     {
+  #       "labels": {"alertname": "HighCPU", "instance": "frontend", ...},
+  #       "annotations": {"summary": "...", "description": "..."},
+  #       "startsAt": "2026-04-24T...",
+  #       "generatorURL": "http://prometheus:9090/..."
+  #     }
+  #   ]
+  # }
   - name: 'webhook-notificaciones'
     webhook_configs:
+      # Reemplazar con el endpoint real del sistema de notificaciones.
+      # Ejemplos: ntfy.sh, un script Flask, un webhook de Slack, etc.
       - url: '{{ alertmanager_webhook_url }}'
+        # send_resolved: también notifica cuando la alerta se resuelve.
+        # Permite saber cuándo el sistema se recuperó, no solo cuándo falló.
         send_resolved: true
 
+# inhibit_rules: silencia alertas de menor severidad cuando ya hay una más grave.
+# Ejemplo: si ya hay una alerta "critical" de que el servidor está caído, no envíes
+# también la alerta "warning" de alta CPU del mismo servidor. El servidor está caído
+# — la CPU alta es consecuencia, no causa.
 inhibit_rules:
   - source_match:
-      severity: critical
+      severity: critical      # cuando existe una alerta critical...
     target_match:
-      severity: warning
-    equal: ['alertname', 'instance']
+      severity: warning       # ...silencia las alertas warning...
+    equal: ['alertname', 'instance']  # ...del mismo alertname e instancia

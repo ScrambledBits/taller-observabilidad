@@ -1,16 +1,37 @@
 # TODO(taller): #3 — targets de aplicaciones con IPs inyectadas desde Terraform
-# Flask expone métricas en /metrics (requiere prometheus_client en la app)
+#
+# Este archivo define los targets de APLICACIONES: servicios que exponen sus propias
+# métricas de negocio (latencia, errores, requests) en lugar de solo métricas del SO.
+#
+# DIFERENCIA ENTRE EXPORTERS Y APPS INSTRUMENTADAS:
+#   - node_exporter (targets_infra.yaml): es un proceso SEPARADO que lee métricas
+#     del kernel/SO y las expone. La app monitoreada no necesita modificarse.
+#
+#   - Flask + prometheus_client: la propia aplicación expone el endpoint /metrics.
+#     Para esto, el desarrollador debe agregar código de instrumentación a la app.
+#     Ventaja: métricas específicas del negocio (p. ej., pedidos_por_segundo,
+#     errores_de_pago, latencia_de_base_de_datos).
+#
+#   - nginx-prometheus-exporter: actúa como traductor. nginx expone estadísticas
+#     básicas en /nginx_status (módulo stub_status), y el exporter las convierte
+#     al formato Prometheus. El proceso exporter es separado de nginx.
+
+# Flask expone métricas en /metrics (requiere prometheus_client instalado en la app)
+# Puerto 5000: puerto por defecto del servidor de desarrollo de Flask.
+# Ver Docs/targets.md, sección 4, para agregar prometheus_client a la app.
 - targets:
     - "{{ backend_target_ip }}:5000"
   labels:
-    job: flask-app
+    job: flask-app       # nombre del job en /targets y en queries
     instance: backend
     entorno: workshop
 
-# nginx-prometheus-exporter expone métricas de nginx en :9113
+# nginx-prometheus-exporter traduce stub_status de nginx al formato Prometheus.
+# Puerto 9113: puerto estándar del nginx-prometheus-exporter.
+# Ver Docs/targets.md, secciones 3.1 y 3.2, para instalación y configuración.
 - targets:
     - "{{ frontend_target_ip }}:9113"
   labels:
-    job: nginx
+    job: nginx           # nombre del job
     instance: frontend
     entorno: workshop

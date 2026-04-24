@@ -1,5 +1,15 @@
 ---
 # TODO(taller): #1 — verificación de checksum + get_url + instalación binaria + systemd
+#
+# Este rol instala node_exporter: el agente que recolecta métricas del sistema
+# operativo (CPU, RAM, disco, red, procesos) y las expone en formato Prometheus
+# en el puerto 9100.
+#
+# Proceso de instalación:
+#   1. Descargar el binario desde GitHub con get_url
+#   2. Extraer el tarball y copiar el binario a /usr/local/bin
+#   3. Crear el servicio systemd para arranque automático
+#   4. Verificar que el endpoint de métricas responde correctamente
 
 - name: Crear directorio de datos de node_exporter
   ansible.builtin.file:
@@ -8,12 +18,20 @@
     owner: "{{ node_exporter_user }}"
     mode: "0755"
 
+# get_url: módulo de Ansible para descargar archivos via HTTP/HTTPS.
+# Equivalente a `wget` pero integrado en Ansible con control de idempotencia:
+# si el archivo ya existe y tiene el mismo tamaño, no vuelve a descargarlo.
+# La URL viene de defaults/main.yaml y se construye con la versión y arquitectura.
 - name: Descargar tarball de node_exporter
   ansible.builtin.get_url:
     url: "{{ node_exporter_url }}"
     dest: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
     mode: "0644"
 
+# unarchive: extrae archivos .tar.gz, .zip, .tar.bz2, etc.
+# remote_src: true → el archivo a extraer ya está en el servidor remoto (no en tu laptop).
+# creates: solo extrae si ese directorio/archivo NO existe aún (idempotencia).
+#          Si ya fue extraído en una ejecución anterior, Ansible omite esta tarea.
 - name: Extraer binario de node_exporter
   ansible.builtin.unarchive:
     src: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
@@ -21,6 +39,14 @@
     remote_src: true
     creates: "/tmp/node_exporter-{{ node_exporter_version }}.{{ arch }}/node_exporter"
 
+# copy con remote_src: true copia un archivo dentro del servidor remoto (de /tmp a /usr/local/bin).
+# /usr/local/bin es el directorio estándar (FHS) para software instalado manualmente,
+# a diferencia de /usr/bin (paquetes del sistema) o /opt (software de terceros autocontenido).
+#
+# notify: cuando esta tarea produce un CAMBIO (el binario es nuevo o diferente),
+# marca el handler "reiniciar node_exporter" para ejecutarse al final del rol.
+# Los handlers se acumulan y corren UNA SOLA VEZ al final, aunque múltiples tareas
+# los notifiquen. Esto evita reinicios innecesarios del servicio.
 - name: Instalar binario de node_exporter en {{ install_dir }}
   ansible.builtin.copy:
     src: "/tmp/node_exporter-{{ node_exporter_version }}.{{ arch }}/node_exporter"
@@ -31,21 +57,30 @@
     mode: "0755"
   notify: reiniciar node_exporter
 
+# template: copia un archivo .j2 al servidor reemplazando {{ variables }} con sus valores.
+# El resultado es la unidad systemd definitiva en /etc/systemd/system/.
+# Systemd detecta el archivo nuevo y lo carga cuando hacemos daemon-reload.
 - name: Instalar unidad systemd de node_exporter
   ansible.builtin.template:
     src: node_exporter.service.j2
     dest: /etc/systemd/system/node_exporter.service
     mode: "0644"
   notify:
-    - recargar systemd
-    - reiniciar node_exporter
+    - recargar systemd        # ejecuta `systemctl daemon-reload` para cargar el archivo nuevo
+    - reiniciar node_exporter # ejecuta `systemctl restart node_exporter`
 
+# enabled: true → node_exporter arrancará automáticamente cuando el servidor reinicie.
+# state: started → lo arranca ahora si no está corriendo.
 - name: Habilitar e iniciar node_exporter
   ansible.builtin.systemd:
     name: node_exporter
     state: started
     enabled: true
 
+# uri: hace una petición HTTP y verifica el código de respuesta.
+# Si node_exporter responde 200 con sus métricas, la instalación fue exitosa.
+# retries + delay: si node_exporter tarda en arrancar, reintenta 5 veces con 3s de espera
+# entre intentos. Útil en servidores lentos. Si falla los 5 intentos, el playbook se detiene.
 - name: Verificar endpoint de métricas de node_exporter
   ansible.builtin.uri:
     url: "http://localhost:{{ node_exporter_port }}/metrics"

@@ -1,19 +1,60 @@
 [Unit]
+# Descripción breve que aparece en `systemctl status node_exporter`
 Description=Prometheus Node Exporter — métricas del sistema operativo
+# After: este servicio arranca DESPUÉS de que la red esté disponible.
+# network.target es un pseudo-target que representa "la red está lista".
+# Necesario porque node_exporter escucha en un puerto de red (:9100).
 After=network.target
 
 [Service]
+# Type=simple: el proceso principal ES el servicio (no hace fork).
+# Systemd considera el servicio "activo" cuando el proceso está corriendo.
+# Otros tipos comunes: forking (el proceso padre hace fork y sale), oneshot (ejecuta y termina).
 Type=simple
+
+# User: el proceso corre como este usuario (no como root).
+# Ver ansible/roles/common/tasks/main.yaml para la creación del usuario.
 User={{ node_exporter_user }}
+
+# ExecStart: el comando exacto que systemd ejecuta para iniciar el servicio.
+# Los flags son:
+#   --web.listen-address: en qué puerto escuchar. Separado en variable para poder cambiarlo.
+#   --collector.systemd: recolecta métricas de los servicios systemd
+#                        (cuántos servicios activos, cuántos fallaron, etc.)
+#   --collector.processes: recolecta métricas de los procesos del sistema
+#                          (cuántos procesos, uso de CPU por proceso, etc.)
+# NOTA: --collector.systemd requiere que el usuario esté en el grupo systemd-journal.
+#       Esto se configura en ansible/roles/common/tasks/main.yaml.
 ExecStart={{ install_dir }}/node_exporter \
   --web.listen-address=":{{ node_exporter_port }}" \
   --collector.systemd \
   --collector.processes
+
+# Restart=on-failure: systemd reiniciará el servicio si muere con código de error > 0.
+# Cubre crashes o errores inesperados. No reinicia si se detiene con `systemctl stop`.
 Restart=on-failure
+# RestartSec: espera 5 segundos antes de reintentar.
+# Evita que un servicio crasheando constantemente consuma todos los recursos.
 RestartSec=5s
+
+# --- Hardening de seguridad ---
+# Estas directivas limitan lo que el proceso puede hacer, reduciendo el impacto
+# de una vulnerabilidad en node_exporter.
+
+# NoNewPrivileges: impide que el proceso adquiera nuevos privilegios mediante
+# setuid/setgid u otras técnicas de escalado de privilegios.
 NoNewPrivileges=true
+
+# ProtectSystem=strict: el proceso solo puede escribir en /tmp y en directorios
+# explícitamente habilitados. El resto del sistema de archivos es de solo lectura.
 ProtectSystem=strict
+
+# ProtectHome=read-only: los directorios /home, /root y /run/user son de solo lectura.
+# Un proceso comprometido no puede leer archivos de los usuarios del sistema.
 ProtectHome=read-only
 
 [Install]
+# WantedBy=multi-user.target: este servicio arrancará cuando el sistema alcance el
+# "multi-user target" (equivalente al nivel de ejecución 3 en SysV init: modo
+# multiusuario sin interfaz gráfica — el modo normal de un servidor Linux).
 WantedBy=multi-user.target

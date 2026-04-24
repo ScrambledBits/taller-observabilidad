@@ -5,7 +5,15 @@ After=network.target
 [Service]
 Type=simple
 User={{ promtail_user }}
+
 ExecStart={{ install_dir }}/promtail -config.file={{ promtail_config_dir }}/promtail-config.yaml
+
+# NOTA: Promtail NO usa ProtectSystem=strict ni ProtectHome=read-only (a diferencia
+# de node_exporter). La razón: Promtail necesita leer archivos de log de /var/log/
+# y acceder al journal de systemd. ProtectSystem=strict haría esos directorios
+# inaccesibles y Promtail no podría recolectar los logs.
+# El usuario "observability" + grupo "systemd-journal" (configurado en el rol common)
+# proporcionan el nivel de acceso mínimo necesario.
 Restart=on-failure
 RestartSec=5s
 

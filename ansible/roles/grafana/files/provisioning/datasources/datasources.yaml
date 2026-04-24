@@ -1,21 +1,45 @@
-apiVersion: 1
+# Configuración de datasources de Grafana mediante "provisioning".
+#
+# PROVISIONING vs CONFIGURACIÓN MANUAL:
+#   Sin provisioning, tendrías que entrar a la UI de Grafana, ir a
+#   Configuration → Data Sources, y configurar cada fuente a mano.
+#   Con provisioning, Grafana lee este archivo al arrancar y configura
+#   los datasources automáticamente. Ventaja: es reproducible y version-controlado.
+#
+# IMPORTANTE — UID FIJOS:
+#   Cada datasource tiene un "uid" único. Los paneles de los dashboards
+#   referencian las fuentes de datos POR uid (no por nombre).
+#   Si cambias el uid aquí, los dashboards existentes mostrarán el error
+#   "Datasource not found" porque buscarán el uid anterior.
+#   Los UIDs de este taller son: "prom-taller" y "loki-taller".
+
+apiVersion: 1  # versión del formato de provisioning de Grafana
 
 datasources:
-  - name: Prometheus
-    type: prometheus
-    uid: prom-taller
-    url: http://localhost:9090
-    access: proxy
-    isDefault: true
+  # --- FUENTE 1: Prometheus ---
+  - name: Prometheus                # nombre que aparece en la UI de Grafana
+    type: prometheus                # tipo de datasource (plugin de Grafana)
+    uid: prom-taller                # identificador fijo — NO cambiar
+    url: http://localhost:9090      # Prometheus corre en el mismo servidor
+    access: proxy                   # "proxy": Grafana hace las queries en nombre del browser.
+                                    # El browser no necesita ver el puerto 9090 directamente.
+                                    # Alternativa "direct": el browser contacta Prometheus
+                                    # directo, pero requiere que el puerto sea accesible.
+    isDefault: true                 # cuando creas un nuevo panel en blanco, usa este datasource
     jsonData:
-      httpMethod: POST
-      prometheusType: Prometheus
-      prometheusVersion: "3.11.0"
+      httpMethod: POST              # Prometheus acepta POST para queries largas.
+                                    # GET tiene límite de longitud en URLs complejas.
+      prometheusType: Prometheus    # tipo específico (hay Mimir, Thanos, Cortex)
+      prometheusVersion: "3.11.0"  # ayuda a Grafana a usar features disponibles en esta versión
 
+  # --- FUENTE 2: Loki ---
   - name: Loki
     type: loki
-    uid: loki-taller
-    url: http://localhost:3100
+    uid: loki-taller                # identificador fijo — NO cambiar
+    url: http://localhost:3100      # Loki corre en el mismo servidor
     access: proxy
     jsonData:
+      # maxLines: cuántas líneas de log devuelve Loki como máximo por consulta.
+      # 1000 es suficiente para explorar logs en Grafana sin saturar el browser.
+      # Para análisis de grandes volúmenes, usar la API de Loki directamente.
       maxLines: 1000

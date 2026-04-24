@@ -1,40 +1,86 @@
 # TODO(taller): #6 — positions + clients + scrape_configs
-# Envía el journal de systemd y syslog del nodo de monitoreo hacia Loki
+#
+# Promtail es el agente que RECOLECTA logs del sistema y los envía a Loki.
+# Es similar a Filebeat o Fluentd, pero diseñado específicamente para Loki.
+#
+# FLUJO DE DATOS:
+#   Archivos de log / systemd journal
+#         ↓  (Promtail los lee)
+#   Promtail agrega etiquetas y los procesa
+#         ↓  (HTTP POST en batches)
+#   Loki los almacena y los indexa por etiquetas
+#         ↓  (query)
+#   Grafana los muestra
+
 server:
+  # Puerto HTTP de la API de Promtail (métricas propias, estado, etc.)
   http_listen_port: {{ promtail_http_port }}
+  # Puerto gRPC: 0 = deshabilitado. Solo se necesita en configuraciones con gRPC.
   grpc_listen_port: 0
   log_level: info
 
 positions:
+  # positions.yaml: Promtail guarda en este archivo hasta qué byte del log
+  # llegó en cada fuente. Si Promtail se reinicia, retoma desde esa posición
+  # en lugar de re-enviar todos los logs desde el principio.
+  # Sin este archivo, cada reinicio enviaría logs duplicados a Loki.
   filename: {{ promtail_positions_dir }}/positions.yaml
 
 clients:
+  # clients: lista de instancias de Loki a las que enviar los logs.
+  # Podría haber múltiples (p. ej., Loki de desarrollo y de producción).
   - url: http://localhost:{{ loki_port }}/loki/api/v1/push
+    # batchwait: espera hasta 1 segundo para acumular logs antes de enviar.
+    # Reduce el número de requests HTTP a Loki, mejorando la eficiencia.
     batchwait: 1s
+    # batchsize: envía el batch cuando acumula 1 MB de logs (lo que ocurra primero).
     batchsize: 1048576
     timeout: 10s
     backoff_config:
+      # backoff: si Loki no responde, reintenta con espera progresiva.
+      # min_period → max_period con max_retries intentos.
+      # Evita bombardear a Loki si está momentáneamente caído.
       min_period: 500ms
       max_period: 5m
       max_retries: 10
 
 scrape_configs:
-  # Recolectar entradas del journal de systemd (todos los servicios del SO)
+  # --- FUENTE 1: systemd journal ---
+  # El journal de systemd es el sistema de logging estructurado de Linux.
+  # Guarda logs de todos los servicios del sistema con metadatos (unidad, PID,
+  # prioridad, timestamp exacto). Es más potente que /var/log/syslog porque
+  # los logs están estructurados (campos separados, no solo texto plano).
   - job_name: journal
     journal:
+      # max_age: solo lee logs de las últimas 12 horas al arrancar.
+      # Sin esto, Promtail intentaría enviar todo el historial del journal
+      # (puede ser GB de datos en sistemas que llevan tiempo corriendo).
       max_age: 12h
       labels:
         job: systemd-journal
+        # ansible_hostname se resuelve en tiempo de provisioning de Ansible.
+        # Queda hardcodeado en el archivo final con el hostname real del nodo.
         host: {{ ansible_hostname }}
+    # relabel_configs: extrae campos del journal como etiquetas de Loki.
+    # El journal tiene campos especiales con prefijo __journal__.
+    # Aquí los convertimos en etiquetas estándar de Loki (sin el prefijo).
     relabel_configs:
+      # __journal__systemd_unit → label "unit"
+      # Ejemplo: "prometheus.service", "node_exporter.service"
+      # Permite filtrar en Grafana: {unit="prometheus.service"}
       - source_labels: ['__journal__systemd_unit']
         target_label: unit
+      # __journal__hostname → label "hostname"
       - source_labels: ['__journal__hostname']
         target_label: hostname
+      # __journal__priority_keyword → label "level" (debug, info, warning, err)
       - source_labels: ['__journal__priority_keyword']
         target_label: level
 
-  # Recolectar syslog del archivo del sistema
+  # --- FUENTE 2: syslog en archivo ---
+  # /var/log/syslog es el archivo de logs tradicional de Linux.
+  # Lo incluimos como fuente complementaria al journal para cubrir servicios
+  # que no usan systemd o que escriben directamente a syslog.
   - job_name: syslog
     static_configs:
       - targets:
@@ -42,10 +88,21 @@ scrape_configs:
         labels:
           job: syslog
           host: {{ ansible_hostname }}
+          # __path__: etiqueta especial de Promtail — indica el archivo a leer.
+          # No se envía como etiqueta a Loki; solo la usa Promtail internamente.
           __path__: /var/log/syslog
+    # pipeline_stages: transforma las líneas de log antes de enviarlas a Loki.
+    # Útil para extraer campos de logs con formato conocido (Apache, nginx, etc.)
+    # o para descartar líneas irrelevantes.
     pipeline_stages:
       - regex:
+          # Extrae campos de una línea típica de syslog:
+          # "Apr 24 10:30:00 hostname service[1234]: mensaje"
           expression: '(?P<timestamp>\w+ +\d+ \d+:\d+:\d+) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)'
       - labels:
+          # Convierte los grupos capturados por regex en etiquetas de Loki.
+          # Solo los campos mencionados aquí se convierten en etiquetas.
+          # "message" y "timestamp" se omiten porque son el contenido del log,
+          # no metadatos de clasificación.
           hostname:
           service:

@@ -1,14 +1,36 @@
 ---
+# Rol "common": configuración base del servidor que todos los demás roles necesitan.
+# Este rol corre primero (ver ansible/site.yaml) porque los demás dependen de:
+#   - Paquetes básicos instalados (curl, wget, etc.)
+#   - Usuario y grupo "observability" creados
+#   - Usuario en el grupo systemd-journal (para node_exporter y promtail)
+
+# apt update: refresca la lista de paquetes disponibles desde los repositorios.
+# cache_valid_time: no vuelve a hacer apt update si el caché tiene menos de 1 hora.
+# Evita requests innecesarios a los servidores de paquetes en ejecuciones repetidas.
 - name: Actualizar caché de apt
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
 
+# upgrade: dist = dist-upgrade: actualiza TODOS los paquetes incluyendo el kernel.
+# Diferencia con upgrade: full:
+#   - upgrade: no elimina paquetes ni agrega nuevos para resolver dependencias
+#   - dist-upgrade: puede eliminar paquetes obsoletos y agregar nuevas dependencias
+# En un servidor nuevo (como este EC2 recién lanzado), es la opción recomendada.
+# register: guarda el resultado en la variable "resultado_upgrade" para usarla después.
 - name: Actualizar todos los paquetes del sistema
   ansible.builtin.apt:
     upgrade: dist
   register: resultado_upgrade
 
+# Paquetes necesarios para los roles siguientes:
+#   - curl, wget: descargar binarios de GitHub
+#   - unzip: extraer Loki y Promtail (se distribuyen como .zip)
+#   - python3: Ansible lo usa para módulos como uri, stat, etc.
+#   - apt-transport-https, gnupg, software-properties-common: para agregar el
+#     repositorio de Grafana con firma GPG (ver rol grafana)
+#   - net-tools: utilidades de red (ifconfig, netstat) útiles para debugging
 - name: Instalar paquetes base
   ansible.builtin.apt:
     name:
@@ -23,12 +45,25 @@
       - net-tools
     state: present
 
+# Crear el GRUPO de sistema primero, luego el usuario que pertenece a él.
+# Un grupo de sistema (system: true) tiene GID < 1000 y no tiene directorio home.
+# Tener un grupo explícito permite controlar permisos de archivos con más granularidad
+# (p. ej., chmod g+r para que el grupo "observability" lea archivos de configuración).
 - name: Crear grupo de sistema para los servicios de observabilidad
   ansible.builtin.group:
     name: "{{ observability_group }}"
     system: true
     state: present
 
+# Crear el USUARIO de sistema con el que corren todos los servicios del stack.
+# Por qué un usuario separado y no root:
+#   1. Principio de mínimo privilegio: si un servicio es comprometido, el atacante
+#      solo tiene acceso como "observability", no como root.
+#   2. Los archivos de config y datos pertenecen a este usuario → control de acceso claro.
+#   3. Auditoría: en los logs se puede ver qué hizo el usuario "observability".
+# system: true → UID < 1000, no aparece en pantallas de login.
+# shell: nologin → nadie puede hacer `su observability` ni abrir sesión SSH con él.
+# create_home: false → sin directorio /home/observability (no lo necesita).
 - name: Crear usuario de sistema para los servicios de observabilidad
   ansible.builtin.user:
     name: "{{ observability_user }}"
@@ -38,14 +73,25 @@
     create_home: false
     state: present
 
-# Necesario para node_exporter (--collector.systemd) y promtail (journal scraping).
-# Se hace aquí, antes de instalar ambos roles, para evitar race conditions.
+# systemd-journal es el grupo que da acceso de lectura al journal de systemd.
+# Sin pertenecer a este grupo, un proceso no-root no puede leer el journal, y:
+#   - node_exporter no puede recolectar métricas de systemd (--collector.systemd)
+#   - promtail no puede leer el journal para enviar logs a Loki
+# Hacemos esto en "common" (antes de instalar esos roles) para que cuando
+# node_exporter y promtail arranquen, el usuario ya tenga el acceso necesario.
 - name: Agregar usuario {{ observability_user }} al grupo systemd-journal
   ansible.builtin.user:
     name: "{{ observability_user }}"
     groups: systemd-journal
-    append: true
+    append: true   # append: true = AGREGA el grupo; false = reemplaza todos los grupos
 
+# Reiniciar si se actualizó el kernel.
+# Cuando se instala un nuevo kernel (linux-image-*), el cambio solo toma efecto
+# después de reiniciar. Los servicios que arranquen antes del reinicio seguirían
+# usando el kernel anterior, lo que podría causar inconsistencias.
+# La condición evalúa:
+#   1. resultado_upgrade.changed → hubo actualizaciones
+#   2. 'linux-image' in stdout → alguna de las actualizaciones fue un kernel
 - name: Reiniciar si se actualizó el kernel
   ansible.builtin.reboot:
     reboot_timeout: 120

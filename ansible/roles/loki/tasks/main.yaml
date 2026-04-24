@@ -1,4 +1,16 @@
 ---
+# Loki es el sistema de agregación y almacenamiento de logs del taller.
+# A diferencia de Elasticsearch o Splunk, Loki NO indexa el contenido de los logs,
+# solo indexa las ETIQUETAS (labels). Ventajas: almacenamiento mucho más compacto,
+# queries rápidas por etiqueta, pero no permite búsqueda full-text directa.
+#
+# Estructura de directorios creados:
+#   /etc/loki/             → archivo de configuración
+#   /var/lib/loki/chunks   → los logs comprimidos (archivos .gz por bloque de tiempo)
+#   /var/lib/loki/rules    → reglas de métricas derivadas de logs (opcional en este taller)
+#   /var/lib/loki/retention → directorio de trabajo del compactor para limpiar datos viejos
+#   /var/lib/loki/index    → índice de etiquetas (qué etiquetas existen, en qué chunks)
+
 - name: Crear directorios de Loki
   ansible.builtin.file:
     path: "{{ item }}"
@@ -13,6 +25,8 @@
     - "{{ loki_data_dir }}/retention"
     - "{{ loki_data_dir }}/index"
 
+# Loki se distribuye como archivo .zip (a diferencia de Prometheus que usa .tar.gz).
+# La URL apunta a la release de GitHub, construida con la versión en defaults/main.yaml.
 - name: Descargar binario de Loki
   ansible.builtin.get_url:
     url: "{{ loki_url }}"
@@ -36,6 +50,8 @@
     mode: "0755"
   notify: reiniciar loki
 
+# Para Loki usamos reiniciar (no recargar) porque Loki no soporta SIGHUP
+# para recargar configuración — requiere reinicio completo del proceso.
 - name: Desplegar configuración de Loki
   ansible.builtin.template:
     src: loki-config.yaml.j2
@@ -59,6 +75,9 @@
     state: started
     enabled: true
 
+# /ready: endpoint de Loki que responde cuando está listo para recibir logs.
+# Loki puede tardar más que Prometheus en arrancar (inicializa el índice TSDB).
+# Por eso usamos retries: 8 con delay: 5 (hasta 40s de espera).
 - name: Verificar endpoint /ready de Loki
   ansible.builtin.uri:
     url: "http://localhost:{{ loki_port }}/ready"

@@ -1,25 +1,82 @@
 ---
-# Versiones de herramientas (verificadas abril 2026)
-node_exporter_version: "1.11.1"
-prometheus_version: "3.11.0"
-loki_version: "3.6.10"
-promtail_version: "3.6.10"
-alertmanager_version: "0.32.0"
+# Variables globales del taller de observabilidad.
+# Estas variables están disponibles para TODOS los roles (son "group vars" del grupo "all").
+# Los roles pueden definir sus propios valores por defecto en defaults/main.yaml,
+# pero las variables definidas aquí tienen mayor prioridad y los sobreescriben.
+#
+# CÓMO ANSIBLE RESUELVE VARIABLES (de mayor a menor prioridad):
+#   extra_vars (-e) > task vars > host_vars > group_vars > role defaults
+#   Referencia: https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_variables.html
 
+# -------------------------------------------------------------------------
+# VERSIONES DE HERRAMIENTAS
+# Cambiar estos valores actualiza todas las referencias en todos los roles.
+# Verificar las últimas versiones estables en GitHub antes del taller.
+# -------------------------------------------------------------------------
+node_exporter_version: "1.11.1"   # https://github.com/prometheus/node_exporter/releases
+prometheus_version: "3.11.0"      # https://github.com/prometheus/prometheus/releases
+loki_version: "3.6.10"            # https://github.com/grafana/loki/releases
+promtail_version: "3.6.10"        # Siempre igual que loki_version (mismo repositorio)
+alertmanager_version: "0.32.0"    # https://github.com/prometheus/alertmanager/releases
+
+# -------------------------------------------------------------------------
+# ARQUITECTURA Y DIRECTORIOS
+# -------------------------------------------------------------------------
+# arch: arquitectura del binario a descargar. "linux-amd64" funciona en EC2
+# de tipo x86_64 (t3.small, t3.medium, etc.). Para EC2 ARM (t4g, m6g) usar "linux-arm64".
 arch: "linux-amd64"
-install_dir: /usr/local/bin
-config_base: /etc
-data_base: /var/lib
 
+# FHS — Filesystem Hierarchy Standard (estándar de estructura de directorios en Linux):
+#   /usr/local/bin → software instalado manualmente (no por el gestor de paquetes del SO)
+#   /etc           → archivos de configuración del sistema
+#   /var/lib       → datos persistentes de las aplicaciones
+# Usamos estas rutas convencionales para que cualquier administrador de Linux
+# sepa dónde buscar cada tipo de archivo sin necesidad de documentación extra.
+install_dir: /usr/local/bin   # destino de los binarios (prometheus, loki, alertmanager, etc.)
+config_base: /etc             # directorio raíz para configuraciones (usado como prefijo)
+data_base: /var/lib           # directorio raíz para datos persistentes
+
+# -------------------------------------------------------------------------
+# USUARIO Y GRUPO DEL SISTEMA
+# -------------------------------------------------------------------------
+# Todos los servicios de observabilidad corren como este usuario/grupo.
+# NO corren como root por el principio de mínimo privilegio:
+# si un servicio es comprometido, el atacante solo tiene acceso como "observability".
+# Ver ansible/roles/common/tasks/main.yaml para la creación del usuario y grupo.
 observability_user: observability
 observability_group: observability
 
-# Puertos compartidos entre roles — definidos aquí para evitar dependencias cruzadas entre roles
-loki_port: 3100
-alertmanager_port: 9093
+# -------------------------------------------------------------------------
+# PUERTOS COMPARTIDOS ENTRE ROLES
+# -------------------------------------------------------------------------
+# Estos puertos son referenciados por MÚLTIPLES roles, por eso están aquí
+# y no en el defaults/main.yaml de cada rol individual. Centralizar evita
+# que un rol use un valor diferente al que otro espera.
+#
+# Por ejemplo: promtail necesita saber en qué puerto corre Loki para enviarle logs.
+# Alertmanager necesita saber en qué puerto escucha Alertmanager.
+loki_port: 3100           # Puerto HTTP de Loki (API de push de logs y queries)
+alertmanager_port: 9093   # Puerto HTTP de Alertmanager (recibe alertas de Prometheus)
 
-# Contraseña del administrador de Grafana — cambiar antes de un despliegue persistente
+# -------------------------------------------------------------------------
+# CREDENCIALES DE GRAFANA
+# -------------------------------------------------------------------------
+# ADVERTENCIA DE SEGURIDAD: esta contraseña está en texto plano en el código.
+# Esto es aceptable para el taller educativo, pero en producción deberías:
+#   1. Usar ansible-vault para cifrar variables sensibles
+#   2. Usar un gestor de secretos (HashiCorp Vault, AWS Secrets Manager)
+#   3. Configurar OAuth2/LDAP en lugar de usuario/contraseña local
+# Para acceder a Grafana: http://<ip>:3000 → usuario "admin" → contraseña abajo.
 grafana_admin_password: "bootcamp2026"
 
-# Receptor de notificaciones de Alertmanager — reemplazar con un endpoint HTTP real
+# -------------------------------------------------------------------------
+# RECEPTOR DE ALERTAS DE ALERTMANAGER
+# -------------------------------------------------------------------------
+# URL del endpoint webhook donde Alertmanager enviará las alertas.
+# El servicio en esa URL debe aceptar HTTP POST con payload JSON.
+# Reemplazar con:
+#   - URL de ntfy.sh: https://ntfy.sh/tu-canal (gratis, sin configuración)
+#   - URL de un webhook de Slack: https://hooks.slack.com/services/...
+#   - URL de PagerDuty, OpsGenie, etc.
+# El valor actual (localhost:5001) solo funciona si tienes un servidor HTTP local.
 alertmanager_webhook_url: "http://localhost:5001/alertas"

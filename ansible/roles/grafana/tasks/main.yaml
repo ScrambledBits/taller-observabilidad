@@ -1,22 +1,44 @@
 ---
+# Grafana es la interfaz de visualización del stack. Se conecta a Prometheus
+# (para métricas) y a Loki (para logs) y muestra dashboards interactivos.
+#
+# A diferencia de los otros componentes, Grafana se instala desde el REPOSITORIO APT
+# oficial de Grafana Labs, en lugar de descargar un binario de GitHub. Ventaja:
+# permite actualizar con `apt upgrade` y resuelve dependencias automáticamente.
+#
+# Para que el repositorio APT sea confiable, primero descargamos la clave GPG
+# (firma criptográfica) con la que Grafana firma sus paquetes. apt verifica esa
+# firma antes de instalar cualquier paquete del repositorio.
+
+# /etc/apt/keyrings/ es el directorio moderno para claves GPG de repositorios APT.
+# Antes se usaba /etc/apt/trusted.gpg.d/ pero keyrings permite mayor control:
+# la clave solo aplica al repositorio específico que la referencia con [signed-by=].
 - name: Crear directorio para keyrings de APT
   ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
     mode: "0755"
 
+# Descargamos la clave GPG en formato ASCII (.asc) directamente de Grafana Labs.
+# Esta clave será usada por apt para verificar que los paquetes del repositorio
+# de Grafana son auténticos y no fueron alterados.
 - name: Descargar clave GPG completa del repositorio de Grafana
   ansible.builtin.get_url:
     url: https://apt.grafana.com/gpg-full.key
     dest: /etc/apt/keyrings/grafana.asc
     mode: "0644"
 
+# Agregamos el repositorio de Grafana a la lista de fuentes de apt.
+# [signed-by=...] le dice a apt qué clave GPG verificar para este repositorio.
+# "stable main" = rama estable de paquetes de Grafana (no beta/nightly).
 - name: Agregar repositorio APT de Grafana
   ansible.builtin.apt_repository:
     repo: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main"
     state: present
-    filename: grafana
+    filename: grafana  # crea /etc/apt/sources.list.d/grafana.list
 
+# Ahora que el repositorio está configurado, instalamos Grafana OSS (Open Source).
+# update_cache: true → hace apt update antes para incluir el repositorio recién agregado.
 - name: Instalar Grafana OSS
   ansible.builtin.apt:
     name: grafana
@@ -30,6 +52,14 @@
     owner: grafana
     mode: "0755"
 
+# PROVISIONING de Grafana:
+# En lugar de configurar datasources y dashboards manualmente desde la UI,
+# usamos el sistema de "provisioning" de Grafana: archivos YAML y JSON en
+# /etc/grafana/provisioning/ que Grafana lee al arrancar.
+# Ventajas:
+#   1. Reproducible: la configuración está en el código (no en la base de datos de Grafana)
+#   2. Sin estado manual: si el servidor se recrea, la config se aplica sola
+#   3. Version-controlled: podemos ver el historial de cambios en los dashboards
 - name: Desplegar configuración de datasources (provisioning)
   ansible.builtin.copy:
     src: provisioning/datasources/datasources.yaml
@@ -38,6 +68,8 @@
     mode: "0644"
   notify: reiniciar grafana
 
+# El dashboard-provider le dice a Grafana en qué carpeta buscar archivos JSON de dashboards.
+# Sin este archivo, Grafana no sabría dónde buscar los dashboards que copiamos.
 - name: Desplegar configuración del proveedor de dashboards (provisioning)
   ansible.builtin.copy:
     src: provisioning/dashboards/dashboard-provider.yaml
@@ -46,6 +78,8 @@
     mode: "0644"
   notify: reiniciar grafana
 
+# El archivo JSON define el dashboard con todos sus paneles.
+# Grafana lee este archivo al arrancar y crea el dashboard automáticamente.
 - name: Desplegar dashboard de overview
   ansible.builtin.copy:
     src: dashboards/overview.json
@@ -54,6 +88,16 @@
     mode: "0644"
   notify: reiniciar grafana
 
+# lineinfile: modifica una línea específica en un archivo de texto.
+# regexp: expresión regular que identifica la línea a reemplazar.
+#   ^;? → la línea puede empezar con ; (comentada) o sin ; (activa)
+#   admin_user = → el patrón a buscar
+# line: el valor que tendrá la línea después de la modificación.
+# insertafter: si la línea no existe, la inserta después de [security].
+#
+# NOTA DE SEGURIDAD: la contraseña se guarda en texto plano en grafana.ini.
+# En producción se usaría un gestor de secretos (HashiCorp Vault, AWS Secrets Manager, etc.)
+# o variables de entorno. Para el taller, texto plano es aceptable.
 - name: Configurar usuario administrador de Grafana
   ansible.builtin.lineinfile:
     path: /etc/grafana/grafana.ini
@@ -70,12 +114,17 @@
     insertafter: "\\[security\\]"
   notify: reiniciar grafana
 
+# El servicio se llama "grafana-server" (no "grafana") porque así lo define
+# el paquete APT de Grafana Labs. Común en paquetes Debian/Ubuntu.
 - name: Habilitar e iniciar Grafana
   ansible.builtin.systemd:
     name: grafana-server
     state: started
     enabled: true
 
+# /api/health: endpoint de Grafana que devuelve {"database":"ok"} cuando está listo.
+# Grafana puede tardar hasta 30-50 segundos en iniciar la primera vez que lee los
+# archivos de provisioning. Por eso usamos retries: 10 con delay: 5 (hasta 50s de espera).
 - name: Verificar endpoint de salud de Grafana
   ansible.builtin.uri:
     url: "http://localhost:{{ grafana_port }}/api/health"

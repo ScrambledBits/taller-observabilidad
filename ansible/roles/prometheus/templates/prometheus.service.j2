@@ -5,13 +5,35 @@ After=network.target
 [Service]
 Type=simple
 User={{ prometheus_user }}
+
 ExecStart={{ install_dir }}/prometheus \
+  # Archivo de configuración principal. Define los targets, reglas, y el alertmanager.
   --config.file={{ prometheus_config_dir }}/prometheus.yml \
+  # Directorio donde Prometheus almacena las series de tiempo (TSDB).
+  # TSDB (Time Series Database) es la base de datos interna de Prometheus,
+  # optimizada para datos con timestamp. Almacena los datos en bloques de 2h.
   --storage.tsdb.path={{ prometheus_data_dir }} \
+  # Cuánto tiempo conservar los datos. 15d = 15 días.
+  # Calcular espacio necesario: ~2-3 bytes por muestra × muestras/segundo × 86400s × 15días.
+  # Con 200 series y scrape cada 15s: ~200 × 4 muestras/min × 60min × 24h × 15d ≈ 170MB
   --storage.tsdb.retention.time=15d \
+  # Puerto en el que escucha la interfaz web y la API de Prometheus.
   --web.listen-address=":{{ prometheus_port }}" \
+  # IMPORTANTE: habilita los endpoints HTTP de gestión:
+  #   POST /-/reload  → recarga la configuración sin reiniciar (lo usan los handlers)
+  #   POST /-/quit    → apaga Prometheus limpiamente
+  # ADVERTENCIA: sin autenticación, cualquiera con acceso al puerto puede hacer reload.
+  # En el taller (SG abierto a 0.0.0.0/0) esto es un riesgo aceptable.
+  # En producción: restringir el SG o añadir autenticación básica.
   --web.enable-lifecycle
+
+# ExecReload: comando ejecutado cuando systemd recibe una señal de reload
+# (por ejemplo, al correr `systemctl reload prometheus`).
+# SIGHUP es la señal Unix tradicional de "recarga configuración".
+# Prometheus la interpreta como: vuelve a leer prometheus.yml sin reiniciarse.
+# $MAINPID es la variable de systemd con el PID del proceso principal.
 ExecReload=/bin/kill -HUP $MAINPID
+
 Restart=on-failure
 RestartSec=5s
 

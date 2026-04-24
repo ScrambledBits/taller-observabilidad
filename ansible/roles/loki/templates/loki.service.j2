@@ -5,7 +5,15 @@ After=network.target
 [Service]
 Type=simple
 User={{ loki_user }}
+
+# NOTA sobre el flag de configuración:
+# Loki usa "-config.file" con UN SOLO guión, no "--config.file".
+# Esto es una convención de algunas aplicaciones escritas en Go que usan
+# el paquete estándar "flag" en lugar de bibliotecas como cobra o urfave/cli.
+# Ambos (- y --) son equivalentes en aplicaciones Go que usan el paquete "flag",
+# pero la convención de Loki es usar un solo guión.
 ExecStart={{ install_dir }}/loki -config.file={{ loki_config_dir }}/loki-config.yaml
+
 Restart=on-failure
 RestartSec=5s
 
