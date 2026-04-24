@@ -40,3 +40,23 @@ resource "terraform_data" "esperar_ssh_monitoreo" {
 
   depends_on = [aws_instance.monitoreo, local_sensitive_file.private_key]
 }
+
+resource "terraform_data" "ansible_provisioning" {
+  # Re-ejecutar el aprovisionamiento si cambian las IPs de las instancias.
+  triggers_replace = [
+    aws_instance.monitoreo.public_ip
+  ]
+
+  # Ejecutar el playbook de Ansible una vez confirmado el acceso SSH.
+  # Se pasa la IP privada del backend como variable para que nginx la use en su configuración.
+  provisioner "local-exec" {
+    command = <<-CMD
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
+        --inventory ${local.ruta_inventario} \
+        --private-key ${local.ruta_llave_ssh} \
+        ${local.ansible_dir}/site.yaml
+    CMD
+  }
+
+  depends_on = [local_file.ansible_inventory, local_sensitive_file.private_key, terraform_data.esperar_ssh_monitoreo]
+}

@@ -34,4 +34,4 @@
 - name: Reiniciar si se actualizó el kernel
   ansible.builtin.reboot:
     reboot_timeout: 120
-  when: resultado_upgrade.changed and "'linux-image' in resultado_upgrade.stdout"
+  when: resultado_upgrade.changed and 'linux-image' in (resultado_upgrade.stdout | default(''))
