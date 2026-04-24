@@ -1,0 +1,18 @@
+---
+# Versiones de herramientas (verificadas abril 2026)
+node_exporter_version: "1.11.1"
+prometheus_version: "3.11.0"
+loki_version: "3.6.10"
+promtail_version: "3.6.10"
+alertmanager_version: "0.32.0"
+
+arch: "linux-amd64"
+install_dir: /usr/local/bin
+config_base: /etc
+data_base: /var/lib
+
+observability_user: observability
+observability_group: observability
+
+# Alertmanager — receptor webhook genérico (reemplazar con endpoint real para notificaciones)
+alertmanager_webhook_url: "http://localhost:5001/alertas"

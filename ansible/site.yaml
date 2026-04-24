@@ -1,0 +1,12 @@
+---
+- name: Provisionar nodo de monitoreo
+  hosts: monitoring
+  become: true
+  roles:
+    - common
+    - node_exporter
+    - prometheus
+    - loki
+    - grafana
+    - alertmanager
+    - promtail

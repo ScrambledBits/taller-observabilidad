@@ -1,0 +1,37 @@
+---
+- name: Actualizar caché de apt
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Actualizar todos los paquetes del sistema
+  ansible.builtin.apt:
+    upgrade: dist
+  register: resultado_upgrade
+
+- name: Instalar paquetes base
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - unzip
+      - python3
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - software-properties-common
+      - net-tools
+    state: present
+
+- name: Crear usuario de sistema para los servicios de observabilidad
+  ansible.builtin.user:
+    name: "{{ observability_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    state: present
+
+- name: Reiniciar si se actualizó el kernel
+  ansible.builtin.reboot:
+    reboot_timeout: 120
+  when: resultado_upgrade.changed and "'linux-image' in resultado_upgrade.stdout"
