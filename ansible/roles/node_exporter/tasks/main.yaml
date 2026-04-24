@@ -1,0 +1,69 @@
+---
+# TODO(taller): #1 — verificación de checksum + get_url + instalación binaria + systemd
+
+- name: Crear directorio de datos de node_exporter
+  ansible.builtin.file:
+    path: "{{ node_exporter_dir }}"
+    state: directory
+    owner: "{{ node_exporter_user }}"
+    mode: "0755"
+
+- name: Obtener el checksum SHA256 esperado desde GitHub
+  ansible.builtin.uri:
+    url: "{{ node_exporter_checksum_url }}"
+    return_content: true
+  register: checksums_txt
+
+- name: Extraer el checksum del archivo tar.gz específico
+  ansible.builtin.set_fact:
+    node_exporter_sha256: >-
+      {{ checksums_txt.content
+         | regex_search('([0-9a-f]{64})\s+node_exporter-' + node_exporter_version + '\.' + arch + '\.tar\.gz', '\\1')
+         | first }}
+
+- name: Descargar tarball de node_exporter con verificación de checksum
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_url }}"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    checksum: "sha256:{{ node_exporter_sha256 }}"
+    mode: "0644"
+
+- name: Extraer binario de node_exporter
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/node_exporter-{{ node_exporter_version }}.{{ arch }}/node_exporter"
+
+- name: Instalar binario de node_exporter en {{ install_dir }}
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.{{ arch }}/node_exporter"
+    dest: "{{ install_dir }}/node_exporter"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: reiniciar node_exporter
+
+- name: Instalar unidad systemd de node_exporter
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+  notify:
+    - recargar systemd
+    - reiniciar node_exporter
+
+- name: Habilitar e iniciar node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Verificar endpoint de métricas de node_exporter
+  ansible.builtin.uri:
+    url: "http://localhost:{{ node_exporter_port }}/metrics"
+    status_code: 200
+  retries: 5
+  delay: 3
