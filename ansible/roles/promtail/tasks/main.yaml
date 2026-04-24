@@ -1,0 +1,71 @@
+---
+- name: Crear directorios de Promtail
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ promtail_user }}"
+    mode: "0755"
+  loop:
+    - "{{ promtail_config_dir }}"
+    - "{{ promtail_positions_dir }}"
+
+# Necesario para que Promtail pueda leer el journal de systemd sin ser root
+- name: Agregar usuario {{ observability_user }} al grupo systemd-journal
+  ansible.builtin.user:
+    name: "{{ promtail_user }}"
+    groups: systemd-journal
+    append: true
+
+- name: Descargar binario de Promtail
+  ansible.builtin.get_url:
+    url: "{{ promtail_url }}"
+    dest: "/tmp/promtail-{{ promtail_version }}.zip"
+    mode: "0644"
+
+- name: Extraer binario de Promtail
+  ansible.builtin.unarchive:
+    src: "/tmp/promtail-{{ promtail_version }}.zip"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/promtail-linux-amd64
+
+- name: Instalar binario de Promtail en {{ install_dir }}
+  ansible.builtin.copy:
+    src: /tmp/promtail-linux-amd64
+    dest: "{{ install_dir }}/promtail"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: reiniciar promtail
+
+- name: Desplegar configuración de Promtail
+  ansible.builtin.template:
+    src: promtail-config.yaml.j2
+    dest: "{{ promtail_config_dir }}/promtail-config.yaml"
+    owner: "{{ promtail_user }}"
+    mode: "0644"
+  notify: reiniciar promtail
+
+- name: Instalar unidad systemd de Promtail
+  ansible.builtin.template:
+    src: promtail.service.j2
+    dest: /etc/systemd/system/promtail.service
+    mode: "0644"
+  notify:
+    - recargar systemd
+    - reiniciar promtail
+
+- name: Habilitar e iniciar Promtail
+  ansible.builtin.systemd:
+    name: promtail
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Verificar endpoint /ready de Promtail
+  ansible.builtin.uri:
+    url: "http://localhost:{{ promtail_http_port }}/ready"
+    status_code: 200
+  retries: 5
+  delay: 3

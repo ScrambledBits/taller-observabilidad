@@ -1,0 +1,19 @@
+[Unit]
+Description=Prometheus — Sistema de monitoreo y alertas
+After=network.target
+
+[Service]
+Type=simple
+User={{ prometheus_user }}
+ExecStart={{ install_dir }}/prometheus \
+  --config.file={{ prometheus_config_dir }}/prometheus.yml \
+  --storage.tsdb.path={{ prometheus_data_dir }} \
+  --storage.tsdb.retention.time=15d \
+  --web.listen-address=":{{ prometheus_port }}" \
+  --web.enable-lifecycle
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

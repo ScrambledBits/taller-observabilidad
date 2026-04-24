@@ -1,0 +1,13 @@
+[Unit]
+Description=Grafana Loki — Agregador de logs
+After=network.target
+
+[Service]
+Type=simple
+User={{ loki_user }}
+ExecStart={{ install_dir }}/loki -config.file={{ loki_config_dir }}/loki-config.yaml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

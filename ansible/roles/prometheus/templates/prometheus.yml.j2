@@ -1,0 +1,44 @@
+# TODO(taller): #2 — scrape_configs con file_sd para service discovery dinámico
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_evaluation_interval }}
+  external_labels:
+    monitor: 'taller-bootcamperu'
+    entorno: 'workshop'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'localhost:9093'
+
+rule_files:
+  - '{{ prometheus_config_dir }}/rules/*.yaml'
+
+scrape_configs:
+  # Auto-monitoreo de Prometheus
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # node_exporter en el propio nodo de monitoreo
+  - job_name: 'node-monitoring'
+    static_configs:
+      - targets: ['localhost:9100']
+    relabel_configs:
+      - target_label: instance
+        replacement: "{{ ansible_hostname }}"
+
+  # Targets externos de infraestructura vía file_sd (se recargan automáticamente cada 30s)
+  - job_name: 'node-external'
+    file_sd_configs:
+      - files:
+          - '{{ prometheus_config_dir }}/targets_infra.yaml'
+        refresh_interval: 30s
+
+  # Targets de aplicaciones vía file_sd
+  - job_name: 'apps'
+    file_sd_configs:
+      - files:
+          - '{{ prometheus_config_dir }}/targets_apps.yaml'
+        refresh_interval: 30s

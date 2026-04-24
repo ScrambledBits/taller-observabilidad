@@ -1,0 +1,17 @@
+---
+# Recarga la configuración sin reiniciar el proceso (requiere --web.enable-lifecycle)
+- name: recargar prometheus
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port }}/-/reload"
+    method: POST
+    status_code: 200
+
+- name: reiniciar prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: restarted
+    daemon_reload: true
+
+- name: recargar systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

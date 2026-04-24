@@ -1,0 +1,84 @@
+---
+- name: Crear directorio para keyrings de APT
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Descargar clave GPG completa del repositorio de Grafana
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg-full.key
+    dest: /etc/apt/keyrings/grafana.asc
+    mode: "0644"
+
+- name: Agregar repositorio APT de Grafana
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+
+- name: Instalar Grafana OSS
+  ansible.builtin.apt:
+    name: grafana
+    state: present
+    update_cache: true
+
+- name: Crear directorio para dashboards
+  ansible.builtin.file:
+    path: "{{ grafana_dashboards_dir }}"
+    state: directory
+    owner: grafana
+    mode: "0755"
+
+- name: Desplegar configuración de datasources (provisioning)
+  ansible.builtin.copy:
+    src: provisioning/datasources/datasources.yaml
+    dest: "{{ grafana_provisioning_dir }}/datasources/datasources.yaml"
+    owner: grafana
+    mode: "0644"
+  notify: reiniciar grafana
+
+- name: Desplegar configuración del proveedor de dashboards (provisioning)
+  ansible.builtin.copy:
+    src: provisioning/dashboards/dashboard-provider.yaml
+    dest: "{{ grafana_provisioning_dir }}/dashboards/dashboard-provider.yaml"
+    owner: grafana
+    mode: "0644"
+  notify: reiniciar grafana
+
+- name: Desplegar dashboard de overview
+  ansible.builtin.copy:
+    src: dashboards/overview.json
+    dest: "{{ grafana_dashboards_dir }}/overview.json"
+    owner: grafana
+    mode: "0644"
+  notify: reiniciar grafana
+
+- name: Configurar usuario administrador de Grafana
+  ansible.builtin.lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: "^;?admin_user ="
+    line: "admin_user = {{ grafana_admin_user }}"
+    insertafter: "\\[security\\]"
+  notify: reiniciar grafana
+
+- name: Configurar contraseña del administrador de Grafana
+  ansible.builtin.lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: "^;?admin_password ="
+    line: "admin_password = {{ grafana_admin_password }}"
+    insertafter: "\\[security\\]"
+  notify: reiniciar grafana
+
+- name: Habilitar e iniciar Grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    state: started
+    enabled: true
+
+- name: Verificar endpoint de salud de Grafana
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/health"
+    status_code: 200
+  retries: 10
+  delay: 5

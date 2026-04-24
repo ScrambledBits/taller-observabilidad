@@ -22,3 +22,32 @@ resource "aws_vpc_security_group_ingress_rule" "permitir_http_grafana" {
   ip_protocol       = "tcp"
   to_port           = 3000
 }
+
+# TODO(taller): #9 — Reglas de ingreso para Alertmanager y Loki
+resource "aws_vpc_security_group_ingress_rule" "permitir_alertmanager" {
+  security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 9093
+  ip_protocol       = "tcp"
+  to_port           = 9093
+  tags = {
+    Name = "alertmanager-ingress"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "permitir_loki" {
+  security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 3100
+  ip_protocol       = "tcp"
+  to_port           = 3100
+  tags = {
+    Name = "loki-ingress"
+  }
+}
+
+resource "aws_vpc_security_group_egress_rule" "permitir_todo_egress" {
+  security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}

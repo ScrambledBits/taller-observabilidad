@@ -1,0 +1,16 @@
+# TODO(taller): #3 — targets de aplicaciones con IPs inyectadas desde Terraform
+# Flask expone métricas en /metrics (requiere prometheus_client en la app)
+- targets:
+    - "{{ backend_target_ip }}:5000"
+  labels:
+    job: flask-app
+    instance: backend
+    entorno: workshop
+
+# nginx-prometheus-exporter expone métricas de nginx en :9113
+- targets:
+    - "{{ frontend_target_ip }}:9113"
+  labels:
+    job: nginx
+    instance: frontend
+    entorno: workshop

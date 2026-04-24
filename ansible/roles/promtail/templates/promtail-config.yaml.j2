@@ -1,0 +1,51 @@
+# TODO(taller): #6 — positions + clients + scrape_configs
+# Envía el journal de systemd y syslog del nodo de monitoreo hacia Loki
+server:
+  http_listen_port: {{ promtail_http_port }}
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: {{ promtail_positions_dir }}/positions.yaml
+
+clients:
+  - url: http://localhost:{{ loki_port }}/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  # Recolectar entradas del journal de systemd (todos los servicios del SO)
+  - job_name: journal
+    journal:
+      max_age: 12h
+      labels:
+        job: systemd-journal
+        host: {{ ansible_hostname }}
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: unit
+      - source_labels: ['__journal__hostname']
+        target_label: hostname
+      - source_labels: ['__journal__priority_keyword']
+        target_label: level
+
+  # Recolectar syslog del archivo del sistema
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: {{ ansible_hostname }}
+          __path__: /var/log/syslog
+    pipeline_stages:
+      - regex:
+          expression: '(?P<timestamp>\w+ +\d+ \d+:\d+:\d+) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)'
+      - labels:
+          hostname:
+          service:

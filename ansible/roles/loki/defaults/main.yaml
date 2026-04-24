@@ -1,0 +1,8 @@
+---
+loki_user: "{{ observability_user }}"
+loki_port: 3100
+loki_grpc_port: 9096
+loki_config_dir: /etc/loki
+loki_data_dir: "{{ data_base }}/loki"
+loki_url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+loki_retention_period: "168h"

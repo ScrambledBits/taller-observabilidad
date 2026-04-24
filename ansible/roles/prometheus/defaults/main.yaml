@@ -1,0 +1,8 @@
+---
+prometheus_user: "{{ observability_user }}"
+prometheus_port: 9090
+prometheus_config_dir: /etc/prometheus
+prometheus_data_dir: "{{ data_base }}/prometheus"
+prometheus_url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.{{ arch }}.tar.gz"
+prometheus_scrape_interval: 15s
+prometheus_evaluation_interval: 15s

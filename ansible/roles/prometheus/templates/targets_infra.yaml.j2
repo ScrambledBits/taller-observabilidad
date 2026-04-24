@@ -1,0 +1,16 @@
+# TODO(taller): #3 — targets de infraestructura con IPs inyectadas desde Terraform
+# node_exporter en el frontend (webstack) — requiere node_exporter instalado en el target
+- targets:
+    - "{{ frontend_target_ip }}:9100"
+  labels:
+    job: node-external
+    instance: frontend
+    entorno: workshop
+
+# node_exporter en el backend (webstack) — requiere node_exporter instalado en el target
+- targets:
+    - "{{ backend_target_ip }}:9100"
+  labels:
+    job: node-external
+    instance: backend
+    entorno: workshop

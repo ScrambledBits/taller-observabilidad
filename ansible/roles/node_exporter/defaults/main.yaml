@@ -1,0 +1,6 @@
+---
+node_exporter_user: "{{ observability_user }}"
+node_exporter_port: 9100
+node_exporter_dir: "{{ data_base }}/node_exporter"
+node_exporter_url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.{{ arch }}.tar.gz"
+node_exporter_checksum_url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/sha256sums.txt"

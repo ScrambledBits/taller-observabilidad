@@ -1,0 +1,72 @@
+---
+- name: Crear directorios de Alertmanager
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ alertmanager_user }}"
+    mode: "0755"
+  loop:
+    - "{{ alertmanager_config_dir }}"
+    - "{{ alertmanager_data_dir }}"
+
+- name: Descargar tarball de Alertmanager
+  ansible.builtin.get_url:
+    url: "{{ alertmanager_url }}"
+    dest: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    mode: "0644"
+
+- name: Extraer Alertmanager
+  ansible.builtin.unarchive:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/alertmanager-{{ alertmanager_version }}.{{ arch }}/alertmanager"
+
+- name: Instalar binarios alertmanager y amtool
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ arch }}/{{ item }}"
+    dest: "{{ install_dir }}/{{ item }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - alertmanager
+    - amtool
+  notify: reiniciar alertmanager
+
+- name: Desplegar configuración de Alertmanager
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ alertmanager_config_dir }}/alertmanager.yml"
+    owner: "{{ alertmanager_user }}"
+    mode: "0640"
+  notify: recargar alertmanager
+
+- name: Instalar unidad systemd de Alertmanager
+  ansible.builtin.template:
+    src: alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+    mode: "0644"
+  notify:
+    - recargar systemd
+    - reiniciar alertmanager
+
+- name: Habilitar e iniciar Alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Validar configuración de Alertmanager con amtool
+  ansible.builtin.command:
+    cmd: "{{ install_dir }}/amtool check-config {{ alertmanager_config_dir }}/alertmanager.yml"
+  changed_when: false
+
+- name: Verificar endpoint /ready de Alertmanager
+  ansible.builtin.uri:
+    url: "http://localhost:{{ alertmanager_port }}/-/ready"
+    status_code: 200
+  retries: 5
+  delay: 3
