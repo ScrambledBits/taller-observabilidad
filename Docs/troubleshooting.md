@@ -1,6 +1,6 @@
 # Troubleshooting — Taller de Observabilidad
 
-Recordá que este repo solo despliega el **nodo monitoring**. Todo lo que veas sobre "targets" se refiere a hosts externos que viven fuera de este repo (ver `docs/TARGETS.md`).
+Recordá que este repo solo despliega el **nodo de monitoreo**. Todo lo referente a "targets" corresponde a hosts externos del proyecto `webstack-bootcamp` (ver `Docs/targets.md`).
 
 ---
 
@@ -10,117 +10,230 @@ Recordá que este repo solo despliega el **nodo monitoring**. Todo lo que veas s
 - `aws sts get-caller-identity` debe devolver tu ARN.
 - Si usás SSO: `aws sso login --profile <perfil>` y exportá `AWS_PROFILE=<perfil>`.
 
-### `Error: InvalidKeyPair.Duplicate`
-- El key pair quedó de una corrida anterior. Borralo:
+### `Error: Failed to load remote state`
+- El stack de apps (`webstack-bootcamp`) no está desplegado, o el bucket S3 `bootcamperu-tf-state` no es accesible con tus credenciales.
+- Verificá que el estado del webstack existe:
   ```bash
-  aws ec2 delete-key-pair --key-name tallerobs-key
+  aws s3 ls s3://bootcamperu-tf-state/bootcamperu.tfstate
+  ```
+
+### `Error: InvalidKeyPair.Duplicate`
+- El key pair quedó de una corrida anterior. Borralo en AWS:
+  ```bash
+  aws ec2 delete-key-pair --key-name taller-observabilidad-bootcamperu
   ```
 
 ### `Error: VcpuLimitExceeded`
-- Tu cuenta AWS no tiene cuota para `t3.small`. Bajá a `t3.micro` en `variables.tf` (Prometheus + Grafana + Loki corren apretados pero arrancan).
+- Tu cuenta AWS no tiene cuota para `t3.small`. Bajá a `t3.micro` en `variables.tf` (el stack arranca ajustado pero funciona).
 
 ### `terraform destroy` se cuelga
-- No tenemos NAT gateway en este stack (solo una subred pública), así que no debería pasar. Si igual se cuelga, revisá si dejaste algún ENI colgado por fuera del state.
+- Este stack no tiene NAT gateway, así que rara vez sucede. Si igual se cuelga, revisá si quedó algún ENI colgado fuera del state en la consola AWS → EC2 → Network Interfaces.
 
 ---
 
 ## Ansible
 
 ### `UNREACHABLE` al correr `make ping`
-- El nodo monitoring está en subred pública con IP elástica efímera. Verificá:
-  - `terraform output monitoring_public_ip` devuelve algo.
-  - Tu IP pública está dentro de `allowed_ingress_cidr` (`curl -s https://checkip.amazonaws.com`).
-  - `chmod 400 terraform/tallerobs-key.pem`.
+
+El nodo de monitoreo tiene IP pública efímera. Verificá:
+
+```bash
+# Confirmar que el output de Terraform tiene una IP
+cd terraform && terraform output monitoring_public_ip
+
+# Verificar que la clave tiene los permisos correctos
+chmod 400 terraform/taller-observabilidad-bootcamperu.pem
+
+# Probar SSH manualmente
+ssh -i terraform/taller-observabilidad-bootcamperu.pem ubuntu@<monitoring_public_ip> echo OK
+```
 
 ### `Permission denied (publickey)`
-- `chmod 400 terraform/tallerobs-key.pem`
-- Y volvé a correr: `ansible -i ansible/inventory.ini all -m ping`
+
+```bash
+chmod 400 terraform/taller-observabilidad-bootcamperu.pem
+make ping
+```
+
+### El inventario tiene una IP vieja
+
+Si destruiste y volviste a crear la infraestructura, regenerá el inventario:
+
+```bash
+make inventario
+```
 
 ### `promtool check config` falla al provisionar
-- La `validate:` de la task de Prometheus corrió promtool con el YAML rendereado. Abrí el archivo:
-  ```bash
-  ssh -i terraform/tallerobs-key.pem ubuntu@<monitoring_ip> \
-      "sudo cat /etc/prometheus/prometheus.yml"
-  ```
-  y validá sintaxis YAML — indentación con espacios, no tabs. Típico error: el TODO #2 con bloques `scrape_configs` mal indentados.
+
+El rol de Prometheus valida la config generada. Para ver qué se renderizó:
+
+```bash
+ssh -i terraform/taller-observabilidad-bootcamperu.pem ubuntu@<monitoring_ip> \
+    "sudo cat /etc/prometheus/prometheus.yml"
+```
+
+Errores típicos: indentación con tabs en vez de espacios, variables Jinja2 sin definir.
+
+### Ansible falla en el condicional de reinicio del kernel
+
+Si ves el error `Conditional result was derived from value of type 'str'`, es un bug conocido de ansible-core 2.19+. El `when` del task de reinicio debe ser una expresión Jinja2 nativa sin comillas externas:
+
+```yaml
+# Incorrecto (string literal en ansible-core 2.19+):
+when: resultado_upgrade.changed and "'linux-image' in resultado_upgrade.stdout"
+
+# Correcto:
+when: resultado_upgrade.changed and 'linux-image' in (resultado_upgrade.stdout | default(''))
+```
 
 ---
 
 ## Prometheus
 
 ### Target externo aparece DOWN en `/targets`
-1. Desde el nodo monitoring:
+
+1. Desde el nodo de monitoreo:
    ```bash
    curl -sS http://<target_ip>:9100/metrics | head
    ```
-   Si no responde → el problema es del target, no del monitoring.
-2. Security Group del **target** permite `:9100` desde el CIDR del monitoring (ver `docs/TARGETS.md`).
-3. En el target: `systemctl status node_exporter` y `journalctl -u node_exporter -n 50`.
+   Si no responde → el problema está en el target, no en el nodo de monitoreo.
+2. Verificá que node_exporter está instalado y activo en el target (ver `Docs/targets.md`).
+3. El Security Group del target debe permitir `:9100` desde el CIDR del nodo de monitoreo.
 
-### `targets_infra.yaml` / `targets_apps.yaml` vacíos
-- Es esperable hasta que completes el TODO #3 pegando las IP:puerto reales. Mientras tanto los jobs `node-external` y `apps` aparecen en Prometheus sin targets.
+### `targets_infra.yaml` / `targets_apps.yaml` sin IPs esperadas
 
-### `prometheus.yml` no se recarga tras editar el template
-- Ansible dispara un `reload` via systemd; si no tomó el cambio:
-  ```bash
-  curl -X POST http://localhost:9090/-/reload
-  ```
-  (Requiere el flag `--web.enable-lifecycle`, que ya viene en el unit file.)
+Las IPs se inyectan desde el remote state de Terraform. Verificá que los outputs del webstack son accesibles:
+
+```bash
+cd terraform && terraform output frontend_target_ip backend_target_ip
+```
+
+Si están vacíos o son incorrectos, el remote state del webstack puede estar desactualizado.
+
+### `prometheus.yml` no se recarga tras editar un template
+
+Ansible dispara un `reload` vía HTTP. Si no tomó el cambio, hacélo manualmente:
+
+```bash
+ssh -i terraform/taller-observabilidad-bootcamperu.pem ubuntu@<monitoring_ip> \
+    "curl -X POST http://localhost:9090/-/reload"
+```
+
+Requiere el flag `--web.enable-lifecycle` en el unit file, que ya viene incluido.
 
 ---
 
 ## Grafana
 
 ### "Datasource not found"
-- Verificá `/etc/grafana/provisioning/datasources/datasources.yaml`. Los UID esperados son `prom-taller` y `loki-taller`.
+
+- Los UIDs esperados son `prom-taller` (Prometheus) y `loki-taller` (Loki).
+- Verificá el archivo de provisioning:
+  ```bash
+  sudo cat /etc/grafana/provisioning/datasources/datasources.yaml
+  ```
 - Reiniciá: `sudo systemctl restart grafana-server`.
 
-### "No data" en panel de CPU
-- Es el TODO #4. La query inicial del dashboard es `up`, y el panel espera un % de CPU. Reemplazá por:
-  ```
-  (1 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100
-  ```
-
 ### Dashboards no aparecen
-- `ls /var/lib/grafana/dashboards/` dentro del nodo debería listar los `.json` provisionados.
-- Revisá `journalctl -u grafana-server -n 100` buscando líneas con `level=error`.
+
+```bash
+# Ver logs de Grafana
+journalctl -u grafana-server -n 100 | grep -i error
+
+# Ver dashboards provisionados
+ls /var/lib/grafana/dashboards/
+```
+
+### Grafana no arranca
+
+```bash
+# Ver estado y logs
+systemctl status grafana-server
+journalctl -u grafana-server -n 50
+```
+
+Causa común: el archivo `grafana.ini` tiene una directiva mal formateada. Verificá los cambios recientes.
 
 ---
 
 ## Loki / Promtail
 
-### Promtail local (del nodo monitoring) no empuja
-- `journalctl -u promtail -n 100` en el nodo.
-- Verificá que el usuario `observability` está en el grupo `systemd-journal` (si no, no lee journald).
-- En este repo, el promtail local apunta a `http://127.0.0.1:3100/loki/api/v1/push` (es self-shipping del monitoring, NO cross-host).
+### Promtail del nodo de monitoreo no empuja
+
+```bash
+# Ver logs del servicio
+journalctl -u promtail -n 100
+
+# Verificar que el usuario observability está en el grupo systemd-journal
+id observability
+
+# Probar conectividad con Loki
+curl -s http://localhost:3100/ready
+```
 
 ### Promtail de un target externo no empuja
-- Esa config vive fuera de este repo. Checklist en el target:
-  - `url: http://<monitoring_private_ip>:3100/loki/api/v1/push` en `clients` (NO `public_ip`, tiene que ser la IP privada).
-  - SG del monitoring permite inbound `:3100/tcp` desde `var.targets_cidr` (TODO #9).
-  - `curl -v http://<monitoring_private_ip>:3100/ready` desde el target responde `ready`.
 
-### Loki devuelve 429
-- Volumen alto para los defaults. Subí `limits_config.ingestion_rate_mb` en el template de Loki (TODO #5 toca retention, podés tocar esto de paso).
+Verificá desde el target:
+
+```bash
+# La URL de push debe usar la IP PRIVADA del nodo de monitoreo (mismo VPC)
+curl -v http://<monitoring_PRIVATE_ip>:3100/ready
+
+# Si no responde, verificar SG del nodo de monitoreo: debe permitir :3100 inbound
+# (ya incluido en terraform/seguridad.tf como `permitir_loki`)
+```
+
+También verificá que el servicio promtail esté activo:
+
+```bash
+systemctl is-active promtail
+journalctl -u promtail -n 50
+```
+
+### Loki devuelve `429 Too Many Requests`
+
+Volumen alto para los defaults. Aumentá los límites en `ansible/roles/loki/templates/loki-config.yaml.j2`:
+
+```yaml
+limits_config:
+  ingestion_rate_mb: 8       # era 4
+  ingestion_burst_size_mb: 12  # era 6
+```
+
+Luego re-provisioná con `make provision`.
 
 ---
 
 ## Alertmanager
 
-### Alertas no llegan a Slack
-- Probá el webhook desde tu laptop primero, fuera del stack:
-  ```bash
-  curl -X POST -H 'Content-type: application/json' \
-       --data '{"text":"hola taller"}' $SLACK_WEBHOOK_URL
-  ```
-- Si el webhook responde `ok`, el problema es el config. En el nodo:
-  - `amtool check-config /etc/alertmanager/alertmanager.yml`
-  - Que el route no tenga un `receiver: null` genérico que se traga todo.
-  - `curl http://localhost:9093/api/v2/status` muestra el config cargado.
+### Alertas no llegan a ningún receptor
+
+1. Verificá que la configuración es válida:
+   ```bash
+   amtool check-config /etc/alertmanager/alertmanager.yml
+   ```
+2. Verificá el config cargado en el proceso:
+   ```bash
+   curl -s http://localhost:9093/api/v2/status | python3 -m json.tool | head -30
+   ```
+3. El `alertmanager_webhook_url` en `ansible/group_vars/all.yaml` debe apuntar a un endpoint HTTP real que acepte POST con payload JSON.
 
 ### La alerta `HighCPU` nunca dispara
-- Verificá la regla en `http://<monitoring_ip>:9090/rules` — debería estar `active` o `pending`.
-- El `for:` de la regla (p. ej. `2m`) obliga a que el CPU esté alto sostenido ese tiempo antes de disparar. Para probar: `stress-ng --cpu 1 --timeout 180s` en el nodo.
+
+- Verificá que la regla está cargada: `http://<monitoring_ip>:9090/rules`
+- El `for: 2m` requiere CPU sostenido > 80% por al menos 2 minutos.
+- Para forzar la condición durante pruebas:
+  ```bash
+  # En el nodo de monitoreo
+  sudo apt install -y stress-ng
+  stress-ng --cpu 1 --timeout 180s &
+  ```
+
+### Alertmanager no recarga tras editar el template
+
+```bash
+curl -X POST http://localhost:9093/-/reload
+```
 
 ---
 
@@ -132,4 +245,9 @@ Siempre al final del taller:
 make tf-destroy
 ```
 
-Si algún recurso quedó huérfano (pasa si matás Terraform a mitad de apply): revisá la consola AWS → EC2 y VPC y borrá manualmente. Con un solo nodo y sin NAT, la limpieza es barata.
+Si algún recurso quedó huérfano (pasa si interrumpís Terraform a mitad de un apply), revisá manualmente:
+- EC2 → Instances
+- VPC → Security Groups
+- EC2 → Key Pairs (nombre: `taller-observabilidad-bootcamperu`)
+
+Con un solo nodo y sin NAT gateway, la limpieza es directa.
