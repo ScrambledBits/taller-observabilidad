@@ -1,0 +1,30 @@
+# TODO(taller): #8 — Regla de alerta HighCPU y otras alertas base
+groups:
+  - name: alertas_observabilidad
+    rules:
+      - alert: HighCPU
+        expr: (1 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta carga de CPU en {{ $labels.instance }}"
+          description: "CPU > 80% durante más de 2 minutos en {{ $labels.instance }} (actual: {{ $value | humanizePercentage }})"
+
+      - alert: InstanciaInaccesible
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instancia caída: {{ $labels.instance }}"
+          description: "{{ $labels.job }}/{{ $labels.instance }} lleva más de 1 minuto sin responder."
+
+      - alert: AltaMemoria
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso alto de memoria en {{ $labels.instance }}"
+          description: "Uso de memoria > 90% en {{ $labels.instance }}"

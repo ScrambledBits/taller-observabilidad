@@ -1,0 +1,97 @@
+---
+- name: Crear directorios de Prometheus
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ prometheus_user }}"
+    mode: "0755"
+  loop:
+    - "{{ prometheus_config_dir }}"
+    - "{{ prometheus_config_dir }}/rules"
+    - "{{ prometheus_data_dir }}"
+
+- name: Descargar tarball de Prometheus
+  ansible.builtin.get_url:
+    url: "{{ prometheus_url }}"
+    dest: "/tmp/prometheus-{{ prometheus_version }}.tar.gz"
+    mode: "0644"
+
+- name: Extraer Prometheus
+  ansible.builtin.unarchive:
+    src: "/tmp/prometheus-{{ prometheus_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/prometheus-{{ prometheus_version }}.{{ arch }}/prometheus"
+
+- name: Instalar binarios prometheus y promtool
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.{{ arch }}/{{ item }}"
+    dest: "{{ install_dir }}/{{ item }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - prometheus
+    - promtool
+  notify: reiniciar prometheus
+
+- name: Desplegar configuración de Prometheus
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_config_dir }}/prometheus.yml"
+    owner: "{{ prometheus_user }}"
+    mode: "0644"
+  notify: recargar prometheus
+
+- name: Desplegar archivo de targets de infraestructura
+  ansible.builtin.template:
+    src: targets_infra.yaml.j2
+    dest: "{{ prometheus_config_dir }}/targets_infra.yaml"
+    owner: "{{ prometheus_user }}"
+    mode: "0644"
+  notify: recargar prometheus
+
+- name: Desplegar archivo de targets de aplicaciones
+  ansible.builtin.template:
+    src: targets_apps.yaml.j2
+    dest: "{{ prometheus_config_dir }}/targets_apps.yaml"
+    owner: "{{ prometheus_user }}"
+    mode: "0644"
+  notify: recargar prometheus
+
+- name: Desplegar reglas de alertas
+  ansible.builtin.copy:
+    src: rules/alerts.yaml
+    dest: "{{ prometheus_config_dir }}/rules/alerts.yaml"
+    owner: "{{ prometheus_user }}"
+    mode: "0644"
+  notify: recargar prometheus
+
+- name: Instalar unidad systemd de Prometheus
+  ansible.builtin.template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    mode: "0644"
+  notify:
+    - recargar systemd
+    - reiniciar prometheus
+
+- name: Habilitar e iniciar Prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Validar configuración de Prometheus con promtool
+  ansible.builtin.command:
+    cmd: "{{ install_dir }}/promtool check config {{ prometheus_config_dir }}/prometheus.yml"
+  changed_when: false
+
+- name: Verificar endpoint /ready de Prometheus
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port }}/-/ready"
+    status_code: 200
+  retries: 5
+  delay: 5
