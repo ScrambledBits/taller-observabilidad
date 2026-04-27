@@ -1,12 +1,33 @@
+# Dashboard provider: le indica a Grafana en qué directorio buscar archivos JSON
+# de dashboards. Sin este archivo, Grafana no sabría dónde encontrar los dashboards
+# que copiamos durante el provisioning de Ansible.
+#
+# El mecanismo de "provisioning de dashboards" funciona así:
+#   1. Este archivo define el "proveedor" (tipo "file" = directorio en disco)
+#   2. Grafana escanea el directorio cada updateIntervalSeconds
+#   3. Cada archivo .json encontrado se importa como un dashboard
+#   4. Si el JSON cambia, Grafana lo recarga automáticamente (allowUiUpdates: true)
+
 apiVersion: 1
 
 providers:
   - name: Dashboards del Taller
     orgId: 1
+    # type: "file" significa que los dashboards se leen desde un directorio del sistema de archivos.
+    # Grafana también soporta otros tipos como "git" (experimental) o proveedores via plugins.
     type: file
+    # disableDeletion: false → si eliminas el JSON del disco, Grafana también elimina el dashboard.
+    # En producción con disableDeletion: true, el dashboard no se puede borrar desde la UI ni desde disco.
     disableDeletion: false
+    # updateIntervalSeconds: cada 30s Grafana comprueba si hay dashboards nuevos o modificados.
     updateIntervalSeconds: 30
+    # allowUiUpdates: true → permite editar el dashboard desde la UI de Grafana.
+    # Si es false, los dashboards quedan en modo "read-only" (solo modificables via JSON).
     allowUiUpdates: true
     options:
+      # path: directorio donde Ansible copia los archivos JSON de dashboards.
+      # Corresponde a grafana_dashboards_dir en defaults/main.yaml.
       path: /var/lib/grafana/dashboards
+      # foldersFromFilesStructure: si fuera true, los subdirectorios dentro de "path"
+      # crearían carpetas en Grafana. false = todos los dashboards en la carpeta raíz.
       foldersFromFilesStructure: false

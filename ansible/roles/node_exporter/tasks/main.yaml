@@ -1,15 +1,16 @@
 ---
-# TODO(taller): #1 — verificación de checksum + get_url + instalación binaria + systemd
+# Rol "node_exporter": instala el agente de métricas del sistema operativo.
 #
-# Este rol instala node_exporter: el agente que recolecta métricas del sistema
-# operativo (CPU, RAM, disco, red, procesos) y las expone en formato Prometheus
-# en el puerto 9100.
+# node_exporter es un binario de Prometheus que recolecta métricas del kernel
+# y del sistema operativo (CPU, RAM, disco, red, procesos) y las expone en
+# formato Prometheus en el puerto 9100 bajo la ruta /metrics.
 #
 # Proceso de instalación:
-#   1. Descargar el binario desde GitHub con get_url
-#   2. Extraer el tarball y copiar el binario a /usr/local/bin
-#   3. Crear el servicio systemd para arranque automático
-#   4. Verificar que el endpoint de métricas responde correctamente
+#   1. Crear directorio de datos
+#   2. Descargar el tarball desde GitHub con get_url
+#   3. Extraer el tarball y copiar el binario a /usr/local/bin
+#   4. Instalar la unidad systemd y habilitar el servicio
+#   5. Verificar que el endpoint /metrics responde correctamente
 
 - name: Crear directorio de datos de node_exporter
   ansible.builtin.file:

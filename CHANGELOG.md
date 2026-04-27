@@ -5,6 +5,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.2.0] — 2026-04-26
+
+### Changed
+- `Docs/targets.md`: eliminado voseo residual (Anotá→Anota, preferís→prefieres, Conectate→Conéctate, Verificá→Verifica, Editá→Edita, Agregá→Agrega, Reemplazá→Reemplaza); corregido "Asumción" por "Asunción"
+- `Docs/troubleshooting.md`: agregada sección "Diagnóstico rápido" al inicio con secuencia de verificación de cuatro pasos
+- `Docs/Quickstart.md`: agregada subsección "Credenciales AWS" con opciones A/B (variables de entorno y perfil nombrado); tabla de TODOs con columna "Tiempo aprox." más descriptiva; tono unificado
+- `README.md`: agregada sección "Credenciales AWS" con instrucciones de configuración antes de la sección de licencia
+
+---
+
 ## [1.1.0] — 2026-04-24
 
 ### Changed

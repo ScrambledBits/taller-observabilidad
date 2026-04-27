@@ -1,9 +1,13 @@
 # Variables de configuración del stack de observabilidad.
-# Para cambiar un valor, puedes:
-#   1. Modificar el "default" aquí directamente
-#   2. Crear un archivo terraform.tfvars con: nombre_variable = "valor"
-#   3. Pasar el valor en la línea de comandos: terraform apply -var="region=us-west-2"
-# Las opciones 2 y 3 tienen mayor prioridad que el default del código.
+#
+# ORDEN DE PRIORIDAD (de menor a mayor):
+#   1. El valor "default" definido aquí en el código
+#   2. Archivo terraform.tfvars (o *.auto.tfvars) — para valores locales, no commitear
+#   3. Variables de entorno con prefijo TF_VAR_: export TF_VAR_region="us-west-2"
+#   4. Línea de comandos: terraform apply -var="region=us-west-2"
+#
+# Para el taller, los defaults son suficientes. Solo cambiarías las variables si
+# quisieras desplegar en otra región o usar otro tipo de instancia.
 
 variable "region" {
   type        = string
@@ -11,21 +15,24 @@ variable "region" {
   default     = "us-east-1"
 }
 
+# Estas variables de red están definidas por consistencia con el stack de apps,
+# pero este stack no crea VPC propia: usa la VPC del stack de apps via remote state.
+# Se mantienen como referencia documental del rango de IPs del entorno.
 variable "vpc_cidr" {
   type        = string
-  description = "Bloque CIDR de la VPC"
+  description = "Bloque CIDR de la VPC (referencia — la VPC la gestiona el stack de apps)"
   default     = "10.0.0.0/16"
 }
 
 variable "public_subnet_cidr" {
   type        = string
-  description = "Bloque CIDR de la subnet pública"
+  description = "Bloque CIDR de la subnet pública (referencia — la subnet la gestiona el stack de apps)"
   default     = "10.0.1.0/24"
 }
 
 variable "private_subnet_cidr" {
   type        = string
-  description = "Bloque CIDR de la subnet privada"
+  description = "Bloque CIDR de la subnet privada (referencia — la subnet la gestiona el stack de apps)"
   default     = "10.0.2.0/24"
 }
 
@@ -60,18 +67,22 @@ variable "usuario_ssh" {
   default     = "ubuntu"
 }
 
-# locals: valores derivados que se calculan a partir de variables u otras expresiones.
-# A diferencia de variable {}, los locals NO son parametrizables desde fuera.
-# Son como constantes calculadas internamente.
+# locals: valores calculados internamente a partir de variables u otras expresiones.
+# Diferencias clave vs variable {}:
+#   - No son parametrizables desde fuera (no se pueden sobreescribir con -var o tfvars)
+#   - Son ideales para transformaciones, concatenaciones y rutas derivadas
+#   - Se acceden como local.<nombre> (sin "s" al final)
 locals {
-  # replace: convierte guiones en guiones bajos para nombres de recursos de AWS
-  # que no aceptan guiones (como algunos nombres de Security Groups).
+  # replace(): función built-in de Terraform. Convierte guiones en guiones bajos
+  # porque algunos recursos de AWS (como los nombres de Security Groups) no aceptan
+  # guiones en ciertos contextos.
   # Ejemplo: "taller-observabilidad-bootcamperu" → "taller_observabilidad_bootcamperu"
   prefijo_proyecto = replace(var.nombre_proyecto, "-", "_")
 
-  # path.module: ruta absoluta al directorio donde está este archivo .tf.
-  # Permite construir rutas relativas al proyecto sin hardcodear paths absolutos.
-  # En este caso apunta al directorio terraform/ del proyecto.
+  # path.module: variable especial de Terraform que resuelve a la ruta ABSOLUTA del
+  # directorio que contiene los archivos .tf que se están ejecutando.
+  # Usar path.module en lugar de rutas hardcodeadas hace el código portable:
+  # funciona sin importar desde qué directorio ejecutes `terraform apply`.
   ruta_llave_ssh  = "${path.module}/${var.nombre_llave_ssh}"
   ansible_dir     = "${path.module}/../ansible"
   ruta_inventario = "${path.module}/../ansible/inventario_terraform.yaml"

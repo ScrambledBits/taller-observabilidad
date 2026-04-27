@@ -4,6 +4,27 @@ Recuerda que este repo solo despliega el **nodo de monitoreo**. Todo lo referent
 
 ---
 
+## Diagnóstico rápido
+
+Antes de entrar en detalle, ejecuta esta secuencia desde tu laptop para ubicar el problema:
+
+```bash
+# 1. Verificar credenciales AWS
+aws sts get-caller-identity
+
+# 2. Verificar que el estado remoto del webstack es accesible
+aws s3 ls s3://bootcamperu-tf-state/bootcamperu.tfstate
+
+# 3. Verificar conectividad SSH al nodo de monitoreo
+make ping
+
+# 4. Ver estado de todos los servicios en el nodo
+ssh -i terraform/taller-observabilidad-bootcamperu.pem ubuntu@<monitoring_ip> \
+    "systemctl is-active prometheus grafana-server loki alertmanager node_exporter promtail"
+```
+
+---
+
 ## Terraform
 
 ### `Error: AuthFailure` / `UnauthorizedOperation`

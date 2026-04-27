@@ -51,8 +51,10 @@ resource "aws_vpc_security_group_ingress_rule" "permitir_http_grafana" {
   to_port           = 3000
 }
 
-# TODO(taller): #9 — Reglas de ingreso para Alertmanager y Loki
-# (Ya implementadas — este TODO servía para que los alumnos las completaran)
+# Nota pedagógica: en una versión anterior del taller, los alumnos agregaban estas reglas
+# como ejercicio. El ejercicio enseñaba la diferencia entre declarar la infraestructura
+# (Terraform) y configurar el software (Ansible): ambos pasos son necesarios para que
+# el servicio sea accesible desde el exterior.
 
 # Regla de ingreso para Alertmanager (puerto 9093)
 # Alertmanager recibe alertas de Prometheus y las envía a los receptores configurados.

@@ -19,7 +19,23 @@ En tu laptop:
 | git         | cualquiera     | `git --version` |
 | ssh         | OpenSSH        | `ssh -V` |
 
-Credenciales AWS: el instructor te dará `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` temporales, o una sesión SSO.
+### Credenciales AWS
+
+El instructor proporcionará `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` temporales, o una sesión SSO. Configúralas antes de continuar:
+
+```bash
+# Opción A — variables de entorno (válido solo en la terminal actual)
+export AWS_ACCESS_KEY_ID="<clave>"
+export AWS_SECRET_ACCESS_KEY="<secreto>"
+export AWS_DEFAULT_REGION="us-east-1"
+
+# Opción B — perfil AWS (persiste entre terminales)
+aws configure --profile taller
+export AWS_PROFILE=taller
+
+# Verificar
+aws sts get-caller-identity
+```
 
 ---
 
@@ -82,7 +98,7 @@ make open
 
 Abre en el browser:
 
-- **Grafana**: `http://<monitoring_public_ip>:3000` — login `admin / bootcamp2026` (cámbialo en producción)
+- **Grafana**: `http://<monitoring_public_ip>:3000` — login `admin / bootcamp2026` (cambia la contraseña en producción)
 - **Prometheus**: `http://<monitoring_public_ip>:9090/targets` — deberías ver:
   - `prometheus` UP (self-scrape)
   - `node-monitoring` UP (node_exporter del propio nodo)
@@ -93,20 +109,20 @@ Abre en el browser:
 
 ## 5. Live coding — completa los 10 TODO
 
-Esta es la parte pedagógica del taller. Cada TODO introduce un concepto clave del stack.
+Esta es la parte pedagógica del taller. Cada TODO introduce un concepto clave del stack. El instructor guiará cada bloque; el orden en la tabla es el pedagógico recomendado.
 
-| # | Archivo | Concepto | ⏱ aprox |
-|---|---------|----------|---------|
-| 1 | `ansible/roles/node_exporter/tasks/main.yaml` | Checksum SHA256 + get_url + binario + systemd | 10' |
-| 2 | `ansible/roles/prometheus/templates/prometheus.yml.j2` | `scrape_configs` con `file_sd` para service discovery | 15' |
-| 3 | `ansible/roles/prometheus/templates/targets_infra.yaml.j2` y `targets_apps.yaml.j2` | IPs de targets inyectadas desde Terraform | 5' |
-| 4 | `ansible/roles/grafana/files/dashboards/overview.json` | Panel PromQL de uso de CPU | 10' |
-| 5 | `ansible/roles/loki/templates/loki-config.yaml.j2` | Almacenamiento filesystem + esquema v13 + retención | 10' |
-| 6 | `ansible/roles/promtail/templates/promtail-config.yaml.j2` | `positions` + `clients` + scrape de journal y syslog | 15' |
-| 7 | `ansible/roles/alertmanager/templates/alertmanager.yml.j2` | Route + receptor de notificaciones (webhook) | 10' |
-| 8 | `ansible/roles/prometheus/files/rules/alerts.yaml` | Regla HighCPU con `for` y `annotations` | 10' |
-| 9 | `terraform/seguridad.tf` | Reglas de ingreso en SG para puertos `:9093` y `:3100` | 5' |
-| 10 | `terraform/user_data/monitoring.sh` | Discusión: Docker vs binarios en bootstrap | - |
+| # | Archivo | Concepto | Tiempo aprox. |
+|---|---------|----------|--------------|
+| 1 | `ansible/roles/node_exporter/tasks/main.yaml` | Checksum SHA256 + get_url + binario + systemd | 10 min |
+| 2 | `ansible/roles/prometheus/templates/prometheus.yml.j2` | `scrape_configs` con `file_sd` para service discovery | 15 min |
+| 3 | `ansible/roles/prometheus/templates/targets_infra.yaml.j2` y `targets_apps.yaml.j2` | IPs de targets inyectadas desde Terraform | 5 min |
+| 4 | `ansible/roles/grafana/files/dashboards/overview.json` | Panel PromQL de uso de CPU | 10 min |
+| 5 | `ansible/roles/loki/templates/loki-config.yaml.j2` | Almacenamiento filesystem + esquema v13 + retención | 10 min |
+| 6 | `ansible/roles/promtail/templates/promtail-config.yaml.j2` | `positions` + `clients` + scrape de journal y syslog | 15 min |
+| 7 | `ansible/roles/alertmanager/templates/alertmanager.yml.j2` | Route + receptor de notificaciones (webhook) | 10 min |
+| 8 | `ansible/roles/prometheus/files/rules/alerts.yaml` | Regla HighCPU con `for` y `annotations` | 10 min |
+| 9 | `terraform/seguridad.tf` | Reglas de ingreso en SG para puertos `:9093` y `:3100` | 5 min |
+| 10 | `terraform/user_data/monitoring.sh` | Discusión: Docker vs binarios en bootstrap | — |
 
 Tras cada TODO que modifique configuración del stack, vuelve a aplicar:
 
@@ -122,7 +138,7 @@ Para los TODO #2 y #3, las IPs de los targets ya están inyectadas automáticame
 
 ## 6. Generar carga desde los targets
 
-Esto se hace **desde el nodo de monitoreo o desde tu laptop**. Tu instructor te dará los comandos. Ejemplo con la IP del frontend del webstack:
+Esto se hace **desde el nodo de monitoreo o desde tu laptop**. El instructor dará los comandos. Ejemplo con la IP del frontend del webstack:
 
 ```bash
 FRONT=$(cd terraform && terraform output -raw frontend_target_ip)
