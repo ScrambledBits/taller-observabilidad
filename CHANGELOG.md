@@ -5,6 +5,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.3.0] — 2026-04-27
+
+### Added
+- `#SPDX-License-Identifier: MIT-0` como línea 1 en los 24 archivos YAML de Ansible (site.yaml ya lo tenía)
+- `defaults/main.yaml` de los 6 roles con comportamiento configurable (node_exporter, prometheus, loki, grafana, alertmanager, promtail): documentación completa del sistema de prioridad de variables Ansible, comentario por variable explicando qué controla y por qué ese valor por defecto, y notas sobre variables inyectadas externamente desde Terraform
+- `handlers/main.yaml` de todos los roles: explicación del mecanismo de handlers (se ejecutan una sola vez al final del play), comentarios específicos sobre hot-reload (Prometheus y Alertmanager vía HTTP POST) vs reinicio completo (Loki, Grafana, Promtail que no soportan SIGHUP), y la importancia de `positions.yaml` en Promtail
+
+### Changed
+- `ansible/site.yaml`: corregido comentario incorrecto (las IPs de targets se pasan por inventario, no por `--extra-vars`)
+
+---
+
 ## [1.2.0] — 2026-04-26
 
 ### Changed

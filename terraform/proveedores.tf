@@ -1,3 +1,22 @@
+# Responsabilidad: declara los providers de Terraform y el backend de estado remoto.
+#
+# ¿Por qué existe como archivo separado?
+# Centralizar los providers en un único archivo facilita actualizar versiones y
+# cambiar el backend sin tocar los archivos de recursos. Es una convención ampliamente
+# adoptada en la comunidad Terraform (equivalente a un "manifest" de dependencias).
+#
+# Restricciones operativas:
+#   - Los bloques `backend {}` se evalúan ANTES de que Terraform cargue variables,
+#     por lo que NO pueden usar var.*, local.* ni data.*. Si necesitas parametrizar
+#     el backend, usa: terraform init -backend-config="bucket=mi-bucket"
+#   - Cambiar el backend después de un apply ya existente requiere `terraform init -migrate-state`
+#     para copiar el estado al nuevo destino antes de poder usar el nuevo backend.
+#
+# Comandos relevantes:
+#   terraform init             → descarga los providers y conecta con el backend S3
+#   terraform init -upgrade    → actualiza los providers a la última versión permitida
+#   terraform providers        → lista los providers y sus versiones efectivas
+
 # El bloque `terraform {}` declara los providers necesarios y el backend de estado.
 # Fijar versiones exactas (o rangos estrechos) es una práctica recomendada:
 # evita que una actualización automática del provider rompa el código sin aviso.
@@ -62,6 +81,10 @@ provider "aws" {
   # - Control de costos: AWS Cost Explorer puede agrupar gastos por etiqueta Project
   # - Automatización: scripts que actúan sobre recursos con etiqueta Environment=dev
   # - Seguridad: políticas IAM que permiten acceso solo a recursos con etiqueta Team=DevOps
+  #
+  # En producción Environment se cambiaría a "staging" o "production" según el entorno.
+  # Separar entornos por etiqueta (en lugar de por cuenta AWS) es aceptable para talleres;
+  # en producción se prefieren cuentas AWS separadas por entorno (AWS Organizations).
   default_tags {
     tags = {
       Environment = "dev"

@@ -1,4 +1,22 @@
-# data "aws_ami": busca dinamicamente la AMI más reciente que cumpla los filtros.
+# Responsabilidad: define la instancia EC2 que actúa como nodo central de observabilidad.
+#
+# ¿Por qué existe como archivo separado?
+# Aislar la definición de cómputo (instancias) de las definiciones de red (seguridad.tf)
+# y de identidad (ssh.tf) sigue el principio de responsabilidad única. Facilita
+# reutilizar o modificar la definición de la instancia sin riesgo de afectar los SGs o las claves.
+#
+# Dependencias externas (del stack de apps via state.tf):
+#   - public_subnet_id: la subnet donde se lanza la instancia
+#   - security_group_ids.publico: SG con reglas de acceso SSH, HTTP, HTTPS
+#   - security_group_ids.comun: SG con reglas de comunicación intra-VPC
+#
+# Restricciones operativas:
+#   - La instancia tiene IP pública para que los alumnos accedan desde sus máquinas.
+#     En producción el nodo de monitoreo iría en subnet privada accesible solo via VPN.
+#   - cloud-init (user_data) se ejecuta UNA SOLA VEZ. Si la instancia se reinicia,
+#     el script NO se vuelve a ejecutar. Para reprovisionar, recrear la instancia.
+
+# data "aws_ami": busca dinámicamente la AMI más reciente que cumpla los filtros.
 # Usar "most_recent = true" con filtros precisos garantiza que siempre tomamos
 # la última imagen parcheada de Ubuntu sin hardcodear el AMI ID (que varía por región).
 #
@@ -7,9 +25,9 @@
 # - Noble Numbat: nombre en clave de la versión 24.04.
 # - hvm-ssd-gp3: virtualización HVM (hardware-assisted), disco SSD tipo gp3 (más barato que gp2).
 #
-# Cuenta 099720109477: ID de AWS de Canonical (fabricante de Ubuntu).
-# Siempre verificar este ID en https://ubuntu.com/server/docs/cloud-images/amazon-ec2
-# para asegurarse de que la AMI es oficial y no maliciosa.
+# most_recent = true  → si hay varias imágenes que coinciden con los filtros, usa la más reciente
+# owners              → ID de Canonical (fabricante de Ubuntu); evita AMIs de terceros no verificados
+# Cuenta 099720109477: verificar en https://ubuntu.com/server/docs/cloud-images/amazon-ec2
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"]
@@ -43,15 +61,17 @@ resource "aws_instance" "monitoreo" {
   # a Grafana y Prometheus desde sus browsers (IP pública).
   # En producción el nodo de monitoreo iría en subnet privada con acceso via VPN o bastion.
   subnet_id                   = data.terraform_remote_state.apps.outputs.public_subnet_id
-  associate_public_ip_address = true
+  associate_public_ip_address = true # necesario para acceder via SSH y a las UIs desde el exterior
 
   key_name = aws_key_pair.bootcamp.key_name
 
   # Lista de Security Groups aplicados a esta instancia.
   # Se combinan las reglas de todos: el resultado es la UNIÓN de todos los permisos.
-  # - security_group_ids.publico: SG del stack de apps (acceso SSH, HTTP, HTTPS)
-  # - security_group_ids.comun: SG compartido para comunicación intra-VPC
-  # - taller_observabilidad_bootcamperu_prometheus: SG de este stack (Prometheus, Grafana, Loki, Alertmanager)
+  #   - security_group_ids.publico: SG del stack de apps (acceso SSH, HTTP, HTTPS)
+  #   - security_group_ids.comun: SG compartido para comunicación intra-VPC
+  #   - taller_observabilidad_bootcamperu_prometheus: SG de este stack (Prometheus, Grafana, Loki, Alertmanager)
+  # Separar los SGs por responsabilidad permite modificar las reglas de observabilidad
+  # sin tocar los SGs del stack de apps (que afectarían a otros recursos).
   vpc_security_group_ids = [
     data.terraform_remote_state.apps.outputs.security_group_ids.publico,
     data.terraform_remote_state.apps.outputs.security_group_ids.comun,
@@ -62,6 +82,14 @@ resource "aws_instance" "monitoreo" {
   # cloud-init es el mecanismo estándar en EC2 para bootstrapping. Se ejecuta como root
   # durante el primer arranque. Ver user_data/monitoring.sh para los detalles.
   user_data = file("${path.module}/user_data/monitoring.sh")
+
+  # NOTA DE PRODUCCIÓN: esta instancia usa IMDSv1 (sin metadata_options.http_tokens = "required").
+  # IMDSv2 protege contra ataques SSRF (Server-Side Request Forgery): con IMDSv1, una aplicación
+  # vulnerable podría ser usada para robar credenciales IAM del endpoint 169.254.169.254.
+  # En producción activar:
+  #   metadata_options {
+  #     http_tokens = "required"
+  #   }
 
   tags = {
     Name = "Instancia Monitoreo"

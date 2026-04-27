@@ -1,5 +1,31 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Variables con precedencia baja (defaults) del rol alertmanager.
+# Pueden sobreescribirse sin modificar el rol.
+#
+# La prioridad de variables en Ansible, de menor a mayor:
+#   defaults del rol  →  vars del rol  →  group_vars  →  host_vars  →  --extra-vars
+#
+# VARIABLES EN group_vars/all.yaml (mayor prioridad):
+#   alertmanager_port        →  9093 (puerto HTTP; definido allí porque prometheus también lo referencia)
+#   alertmanager_webhook_url →  URL del receptor de notificaciones
+
+# alertmanager_user: usuario del sistema operativo bajo el que corre el proceso.
 alertmanager_user: "{{ observability_user }}"
+
+# alertmanager_config_dir: directorio de configuración de Alertmanager.
+# Contiene alertmanager.yml con la configuración de rutas y receptores.
 alertmanager_config_dir: /etc/alertmanager
+
+# alertmanager_data_dir: directorio de datos persistentes de Alertmanager.
+# Aquí Alertmanager guarda:
+#   - silences.json: silenciamientos activos (evitan notificaciones durante incidentes conocidos)
+#   - nflog: notification log (evita enviar la misma notificación repetidamente)
+# Si se borra este directorio, se pierden los silenciamientos activos.
+# En producción este directorio debería tener backup.
 alertmanager_data_dir: "{{ data_base }}/alertmanager"
+
+# alertmanager_url: URL de descarga del binario desde GitHub Releases.
+# El archivo incluye dos binarios: 'alertmanager' y 'amtool' (CLI de administración).
+# {{ arch }} se resuelve desde group_vars/all.yaml ("linux-amd64" para x86_64).
 alertmanager_url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.{{ arch }}.tar.gz"

@@ -1,5 +1,36 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Variables con precedencia baja (defaults) del rol node_exporter.
+# Pueden sobreescribirse sin modificar el rol.
+#
+# La prioridad de variables en Ansible, de menor a mayor:
+#   defaults del rol  →  vars del rol  →  group_vars  →  host_vars  →  --extra-vars
+#
+# Varias variables aquí referencian valores de group_vars/all.yaml
+# (observability_user, data_base, node_exporter_version, arch). El valor
+# de group_vars sobreescribe los defaults si hubiera conflicto de nombre.
+
+# node_exporter_user: usuario del sistema operativo bajo el que corre el proceso.
+# Referencia observability_user (definido en group_vars/all.yaml) para que todos
+# los servicios del stack usen el mismo usuario sin privilegios.
 node_exporter_user: "{{ observability_user }}"
+
+# node_exporter_port: puerto en el que node_exporter expone las métricas.
+# 9100 es el puerto oficial registrado en la IANA para este servicio.
+# Prometheus scrapeará http://<host>:9100/metrics en cada ciclo de scraping.
 node_exporter_port: 9100
+
+# node_exporter_dir: directorio local donde se descarga y extrae el tarball.
+# Se usa /var/lib/node_exporter (via la variable data_base) para seguir la
+# convención FHS: /var/lib es para datos persistentes de aplicaciones.
 node_exporter_dir: "{{ data_base }}/node_exporter"
+
+# node_exporter_url: URL de descarga del binario desde GitHub Releases.
+# La URL se construye dinámicamente con las variables node_exporter_version y arch
+# (ambas definidas en group_vars/all.yaml). Cambiar la versión en group_vars
+# actualiza automáticamente esta URL sin tocar este archivo.
+#
+# Ejemplo con los valores actuales:
+#   https://github.com/prometheus/node_exporter/releases/download/v1.11.1/
+#   node_exporter-1.11.1.linux-amd64.tar.gz
 node_exporter_url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.{{ arch }}.tar.gz"

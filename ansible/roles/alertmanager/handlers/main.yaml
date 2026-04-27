@@ -1,16 +1,35 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Handlers del rol alertmanager.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true).
+#
+# Alertmanager soporta dos mecanismos de actualización:
+#   1. Hot-reload via HTTP POST (sin downtime): recarga alertmanager.yml en memoria
+#      SIN borrar los silenciamientos activos ni el log de notificaciones.
+#   2. Reinicio completo via systemd: los silenciamientos activos NO se pierden
+#      porque están en el directorio de datos (alertmanager_data_dir/silences.json),
+#      pero hay un breve período de indisponibilidad.
+
+# recargar alertmanager: hot-reload via HTTP POST a /-/reload.
+# Preferible al reinicio cuando solo cambia la configuración (rutas, receptores),
+# porque no interrumpe el procesamiento de alertas activas.
 - name: recargar alertmanager
   ansible.builtin.uri:
     url: "http://localhost:{{ alertmanager_port }}/-/reload"
     method: POST
     status_code: 200
 
+# reiniciar alertmanager: reinicio completo del proceso vía systemd.
+# Se usa cuando cambia el binario o cuando el hot-reload falla.
 - name: reiniciar alertmanager
   ansible.builtin.systemd:
     name: alertmanager
     state: restarted
     daemon_reload: true
 
+# recargar systemd: recarga los archivos de unidades sin reiniciar servicios.
 - name: recargar systemd
   ansible.builtin.systemd:
     daemon_reload: true

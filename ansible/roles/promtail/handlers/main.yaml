@@ -1,10 +1,26 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Handlers del rol promtail.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true).
+#
+# NOTA: Promtail no soporta hot-reload de configuración. Los cambios en
+# promtail-config.yaml.j2 requieren reinicio del proceso.
+# Al reiniciar, Promtail retoma el procesamiento de logs desde donde lo dejó,
+# gracias al archivo positions.yaml (ver promtail_positions_dir en defaults/main.yaml).
+# Esto garantiza que no se envían logs duplicados ni se pierden logs del período
+# en que Promtail estuvo detenido.
+
+# reiniciar promtail: reinicio completo del proceso Promtail.
+# 'daemon_reload: true' asegura que systemd usa la unidad .service actualizada.
 - name: reiniciar promtail
   ansible.builtin.systemd:
     name: promtail
     state: restarted
     daemon_reload: true
 
+# recargar systemd: recarga los archivos de unidades sin reiniciar servicios.
 - name: recargar systemd
   ansible.builtin.systemd:
     daemon_reload: true

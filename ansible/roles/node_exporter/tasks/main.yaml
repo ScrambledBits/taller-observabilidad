@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Rol "node_exporter": instala el agente de métricas del sistema operativo.
 #

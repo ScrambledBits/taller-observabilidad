@@ -1,3 +1,5 @@
+#SPDX-License-Identifier: MIT-0
+---
 # Reglas de alerta base del taller: HighCPU, InstanciaInaccesible y AltaMemoria.
 #
 # ANATOMÍA DE UNA REGLA DE ALERTA EN PROMETHEUS:

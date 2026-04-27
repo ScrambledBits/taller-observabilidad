@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Alertmanager recibe alertas disparadas por Prometheus y decide qué hacer con ellas:
 # agruparlas, silenciarlas, inhibirlas, o enviarlas a uno o más receptores

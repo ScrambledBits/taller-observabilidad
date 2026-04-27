@@ -1,8 +1,45 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Variables con precedencia baja (defaults) del rol loki.
+# Pueden sobreescribirse sin modificar el rol.
+#
+# La prioridad de variables en Ansible, de menor a mayor:
+#   defaults del rol  →  vars del rol  →  group_vars  →  host_vars  →  --extra-vars
+#
+# ATENCIÓN: loki_port y loki_retention_period TAMBIÉN están definidas en
+# group_vars/all.yaml (con mayor prioridad). Las versiones de group_vars son
+# las que realmente se usan en ejecución. Las de aquí son solo el valor de respaldo
+# si no existiera group_vars.
+
+# loki_user: usuario del sistema operativo bajo el que corre el proceso Loki.
 loki_user: "{{ observability_user }}"
+
+# loki_port: puerto HTTP de Loki para la API de push de logs y de queries LogQL.
+# 3100 es el puerto oficial de Loki. Este valor está también en group_vars/all.yaml
+# porque otros roles (promtail) necesitan conocer este puerto para enviar logs.
 loki_port: 3100
+
+# loki_grpc_port: puerto gRPC de Loki para comunicación interna entre componentes.
+# En el modo monolítico (single binary) que usa este taller, el gRPC se usa
+# internamente. No es necesario abrirlo en el Security Group.
 loki_grpc_port: 9096
+
+# loki_config_dir: directorio de configuración de Loki.
 loki_config_dir: /etc/loki
+
+# loki_data_dir: directorio donde Loki almacena los chunks de logs en el filesystem.
+# En producción se usaría un backend de objeto (S3, GCS) en lugar del filesystem local
+# para garantizar durabilidad y escalabilidad. Para el taller el filesystem es suficiente.
 loki_data_dir: "{{ data_base }}/loki"
+
+# loki_url: URL de descarga del binario desde GitHub Releases.
+# Loki se distribuye como archivo .zip (no tarball). El binario resultante es 'loki'.
+# NOTA: La versión de Loki y de Promtail siempre deben coincidir (mismo repositorio).
+# Cambiar loki_version en group_vars/all.yaml actualiza ambos automáticamente.
 loki_url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+
+# loki_retention_period: tiempo durante el cual Loki conserva los logs antes de eliminarlos.
+# 168h = 7 días. El compactor de Loki aplica esta política de retención periódicamente.
+# En producción se ajustaría según los requerimientos de auditoría y el costo de almacenamiento.
+# Ver también: loki-config.yaml.j2 → sección compactor (retention_enabled: true).
 loki_retention_period: "168h"

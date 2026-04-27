@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Loki es el sistema de agregación y almacenamiento de logs del taller.
 # A diferencia de Elasticsearch o Splunk, Loki NO indexa el contenido de los logs,

@@ -1,5 +1,32 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Variables con precedencia baja (defaults) del rol grafana.
+# Pueden sobreescribirse sin modificar el rol.
+#
+# La prioridad de variables en Ansible, de menor a mayor:
+#   defaults del rol  →  vars del rol  →  group_vars  →  host_vars  →  --extra-vars
+#
+# NOTA: grafana_admin_password NO está aquí sino en group_vars/all.yaml.
+# Se mantiene allí para que sea visible y fácil de cambiar antes del taller,
+# sin necesidad de entrar en los defaults del rol. En producción se usaría
+# ansible-vault o un gestor de secretos.
+
+# grafana_port: puerto en el que Grafana expone su interfaz web.
+# 3000 es el puerto por defecto de Grafana. Acceder a http://<ip>:3000.
 grafana_port: 3000
+
+# grafana_admin_user: nombre del usuario administrador inicial de Grafana.
+# Este usuario se crea automáticamente en el primer arranque.
 grafana_admin_user: admin
+
+# grafana_provisioning_dir: directorio donde Grafana lee la configuración de
+# datasources y dashboards al arrancar (provisioning automático).
+# El provisioning permite que la configuración viva en archivos de código
+# en lugar de en la base de datos de Grafana, haciendo el setup reproducible.
+# Ver: roles/grafana/files/provisioning/ para los archivos de configuración.
 grafana_provisioning_dir: /etc/grafana/provisioning
+
+# grafana_dashboards_dir: directorio donde Grafana busca los archivos JSON de dashboards.
+# Este path debe coincidir con el valor de `path` en el dashboard provider.
+# Ver: roles/grafana/files/provisioning/dashboards/dashboard-provider.yaml
 grafana_dashboards_dir: /var/lib/grafana/dashboards

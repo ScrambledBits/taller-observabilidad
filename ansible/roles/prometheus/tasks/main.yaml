@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Prometheus es el motor central de métricas del stack de observabilidad.
 # Recolecta métricas de todos los targets, las almacena en su base de datos TSDB

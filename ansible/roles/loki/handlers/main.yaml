@@ -1,10 +1,25 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Handlers del rol loki.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true).
+#
+# NOTA: Loki v3.x no soporta hot-reload de configuración vía SIGHUP ni HTTP.
+# Cualquier cambio en loki-config.yaml.j2 requiere un reinicio completo del proceso.
+# Esto significa un breve período (~2-5 segundos) en que no se aceptan nuevos logs.
+# Los logs enviados durante ese período se perderán si promtail no tiene buffer
+# suficiente — en producción se usaría alta disponibilidad (múltiples instancias).
+
+# reiniciar loki: reinicio completo del proceso Loki.
+# 'daemon_reload: true' asegura que systemd usa la unidad .service actualizada.
 - name: reiniciar loki
   ansible.builtin.systemd:
     name: loki
     state: restarted
     daemon_reload: true
 
+# recargar systemd: recarga los archivos de unidades sin reiniciar servicios.
 - name: recargar systemd
   ansible.builtin.systemd:
     daemon_reload: true

@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Rol "common": configuración base del servidor que todos los demás roles necesitan.
 # Este rol corre primero (ver ansible/site.yaml) porque los demás dependen de:

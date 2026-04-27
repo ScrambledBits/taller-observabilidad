@@ -1,4 +1,18 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Handlers del rol common.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true). Si tres
+# tareas notifican el mismo handler, este se ejecuta una sola vez — no tres veces.
+# Esto evita reinicios o recargas innecesarios cuando múltiples tareas modifican
+# archivos relacionados en la misma ejecución del playbook.
+
+# Recargar systemd: necesario después de modificar archivos de unidades (.service).
+# 'daemon_reload: true' equivale a 'systemctl daemon-reload': hace que systemd
+# relea todos los archivos de unidades del sistema. Sin este paso, systemd
+# seguiría usando la versión anterior de la unidad en memoria.
+# Este handler lo notifican los roles que instalan nuevos servicios systemd.
 - name: Recargar systemd
   ansible.builtin.systemd:
     daemon_reload: true

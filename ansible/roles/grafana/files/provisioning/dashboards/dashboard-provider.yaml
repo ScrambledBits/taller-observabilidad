@@ -1,3 +1,5 @@
+#SPDX-License-Identifier: MIT-0
+---
 # Dashboard provider: le indica a Grafana en qué directorio buscar archivos JSON
 # de dashboards. Sin este archivo, Grafana no sabría dónde encontrar los dashboards
 # que copiamos durante el provisioning de Ansible.

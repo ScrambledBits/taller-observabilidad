@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Grafana es la interfaz de visualización del stack. Se conecta a Prometheus
 # (para métricas) y a Loki (para logs) y muestra dashboards interactivos.

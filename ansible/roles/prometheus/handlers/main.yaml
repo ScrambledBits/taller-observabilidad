@@ -1,17 +1,38 @@
+#SPDX-License-Identifier: MIT-0
 ---
-# Recarga la configuración sin reiniciar el proceso (requiere --web.enable-lifecycle)
+# Handlers del rol prometheus.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true).
+#
+# Prometheus soporta dos mecanismos de actualización de configuración:
+#   1. Hot-reload via HTTP POST (sin downtime): solo recarga prometheus.yml y las reglas.
+#      Requiere que Prometheus arranque con el flag --web.enable-lifecycle.
+#   2. Reinicio completo via systemd: necesario cuando cambia el binario.
+
+# recargar prometheus: envía una señal HTTP POST a /-/reload para que Prometheus
+# relea su configuración sin interrumpir el scraping ni perder datos en memoria.
+# Ventaja sobre el reinicio: las series temporales en memoria no se pierden,
+# las conexiones activas no se interrumpen, y el downtime es cero.
+# Solo funciona si Prometheus arrancó con '--web.enable-lifecycle'.
+# Ver: templates/prometheus.service.j2
 - name: recargar prometheus
   ansible.builtin.uri:
     url: "http://localhost:{{ prometheus_port }}/-/reload"
     method: POST
     status_code: 200
 
+# reiniciar prometheus: reinicio completo del proceso vía systemd.
+# Se usa cuando cambia el binario o cuando el hot-reload falla.
+# 'daemon_reload: true' asegura que systemd usa el archivo .service actualizado.
 - name: reiniciar prometheus
   ansible.builtin.systemd:
     name: prometheus
     state: restarted
     daemon_reload: true
 
+# recargar systemd: recarga los archivos de unidades sin reiniciar servicios.
+# Se notifica cuando solo cambia el archivo .service (sin cambio de binario ni config).
 - name: recargar systemd
   ansible.builtin.systemd:
     daemon_reload: true

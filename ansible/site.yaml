@@ -1,42 +1,27 @@
+#SPDX-License-Identifier: MIT-0
 ---
-# Playbook principal del taller de observabilidad.
-# Un "playbook" de Ansible es la lista de tareas a ejecutar en uno o más servidores.
-# Este playbook tiene un solo "play" que ejecuta 7 roles en el nodo de monitoreo.
+# Playbook principal del stack de observabilidad.
+# Configura una única instancia EC2 con 7 componentes en secuencia:
 #
-# HOSTS:
-#   "monitoring" es el nombre del host definido en ansible/inventario_terraform.yaml.
-#   Ese archivo fue generado automáticamente por Terraform con la IP real de la EC2.
+#   common        → usuario del sistema, paquetes base, configuración de journald
+#   node_exporter → métricas del sistema operativo (CPU, RAM, disco, red)
+#   prometheus    → motor de métricas, scraping y almacenamiento de series temporales
+#   loki          → motor de logs, recibe entradas de promtail
+#   grafana       → visualización: dashboards para métricas (Prometheus) y logs (Loki)
+#   alertmanager  → enrutamiento de alertas generadas por las reglas de Prometheus
+#   promtail      → agente de logs, reenvía el journal de systemd a Loki
 #
-# BECOME:
-#   become: true significa que Ansible ejecutará las tareas como root usando sudo.
-#   Es equivalente a hacer `sudo` antes de cada comando. Necesario para:
-#     - Instalar paquetes con apt
-#     - Copiar archivos a /etc/ y /usr/local/bin/
-#     - Crear usuarios del sistema
-#     - Gestionar servicios con systemctl
+# El orden importa: prometheus debe estar instalado antes de alertmanager (alertmanager
+# lee la configuración de Prometheus para validar el endpoint). Loki debe estar antes
+# de promtail (promtail necesita el endpoint de Loki para arrancar sin error).
 #
-# ORDEN DE LOS ROLES:
-#   El orden importa porque existen dependencias entre roles:
+# Flujo de datos:
+#   1. 'terraform apply' crea la EC2 y obtiene su IP pública.
+#   2. Terraform escribe ansible/inventario_terraform.yaml con esa IP.
+#   3. Terraform llama a este playbook usando el inventario generado, que incluye las IPs
+#      de los targets (frontend_target_ip, backend_target_ip) como variables de inventario.
 #
-#   1. common       → prepara el SO base (paquetes, usuario observability, grupo systemd-journal)
-#                     DEBE ir primero porque todos los demás roles dependen del usuario
-#
-#   2. node_exporter → instala métricas del SO; necesita el usuario observability (de common)
-#
-#   3. prometheus   → instala el motor de métricas; necesita node_exporter corriendo para
-#                     que el job "node-monitoring" aparezca UP inmediatamente
-#
-#   4. loki         → instala el motor de logs; debe estar corriendo antes de promtail
-#                     para que promtail pueda enviarle logs al iniciar
-#
-#   5. grafana      → interfaz de visualización; necesita que prometheus y loki estén
-#                     corriendo para que los datasources funcionen al verificar
-#
-#   6. alertmanager → recibe alertas de prometheus; puede instalarse en cualquier orden
-#                     después de prometheus, pero antes de que los estudiantes editen
-#                     el alertmanager.yml (TODO #7)
-#
-#   7. promtail     → envía logs a loki; DEBE ir después de loki para que pueda conectar
+# 'become: true' indica que las tareas se ejecutan con privilegios de superusuario (sudo).
 
 - name: Provisionar nodo de monitoreo
   hosts: monitoring
