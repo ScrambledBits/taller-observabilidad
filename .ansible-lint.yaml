@@ -1,0 +1,35 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Configuración de ansible-lint para el taller de observabilidad.
+# Perfil 'basic': activa las reglas fundamentales de calidad y seguridad de Ansible.
+# Perfiles disponibles (de menos a más estricto): min < basic < moderate < safety < shared < production
+#
+# Ejecutar localmente:
+#   ansible-lint ansible/site.yaml
+#
+# El pipeline CI/CD lo ejecuta en cada push y PR (ver .github/workflows/pipeline.yaml).
+
+profile: basic
+
+exclude_paths:
+  # Inventario generado automáticamente por Terraform. No es código Ansible — no lintear.
+  - ansible/inventario_terraform.yaml
+
+warn_list:
+  # yaml[truthy]: acepta 'yes'/'no' como booleanos YAML (Ansible los usaba históricamente).
+  - yaml[truthy]
+  # name[casing]: los nombres de tareas en español no siguen la capitalización inglesa
+  # ("reiniciar loki" es correcto en español aunque empiece con minúscula).
+  - name[casing]
+
+skip_list:
+  # yaml[comments]: el header SPDX (#SPDX-License-Identifier: MIT-0) no tiene espacio
+  # después del '#'. El estándar SPDX requiere exactamente esta forma sin espacio.
+  # Referencia: https://spdx.dev/ids/
+  - yaml[comments]
+  # yaml[line-length]: las URLs de descarga de Prometheus/Loki/Alertmanager construidas
+  # con variables Jinja2 superan los 160 caracteres. No es posible partirlas sin
+  # romper la funcionalidad.
+  - yaml[line-length]
+
+use_default_rules: true
