@@ -26,6 +26,8 @@
 #   version = "~> 2.0"  → cualquier 2.x pero no 3.x (permite patches automáticos)
 #   version = ">= 4.0"  → cualquier versión 4 o superior (menos restrictivo)
 terraform {
+  required_version = ">= 1.6"
+
   required_providers {
     # Provider oficial de AWS — gestiona todos los recursos de AWS (EC2, S3, SGs, etc.)
     aws = {
