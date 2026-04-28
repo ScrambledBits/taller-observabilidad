@@ -1,6 +1,6 @@
 # Quickstart — Taller de Observabilidad
 
-Guía paso a paso para los **alumnos**. Tiempo estimado en "happy path": ~20 min para tener el stack arriba (sin contar los TODO).
+Guía paso a paso para los **alumnos**. Tiempo estimado en "happy path": ~20 min para tener el stack arriba (sin contar los ejercicios prácticos del live coding).
 
 **Scope**: este repo solo despliega el nodo de monitoreo. Los targets (apps que vamos a monitorear) son externos y viven en el repo `webstack-bootcamp`. Ver `Docs/targets.md` para prepararlos.
 
@@ -74,7 +74,7 @@ El `apply` también genera `ansible/inventario_terraform.yaml` automáticamente 
 
 ## 3. Verificar conectividad y re-provisionar
 
-El `terraform apply` del paso anterior ya ejecutó Ansible automáticamente al terminar. Si necesitas volver a aplicar cambios de Ansible (por ejemplo, después de editar un TODO):
+El `terraform apply` del paso anterior ya ejecutó Ansible automáticamente al terminar. Si necesitas volver a aplicar cambios de Ansible (por ejemplo, después de modificar una configuración durante los ejercicios):
 
 ```bash
 cd ..
@@ -107,9 +107,9 @@ Abre en el browser:
 
 ---
 
-## 5. Live coding — completa los 10 TODO
+## 5. Live coding — ejercicios prácticos
 
-Esta es la parte pedagógica del taller. Cada TODO introduce un concepto clave del stack. El instructor guiará cada bloque; el orden en la tabla es el pedagógico recomendado.
+Esta es la parte pedagógica del taller. Cada ejercicio introduce un concepto clave del stack. El instructor guiará cada bloque; el orden en la tabla es el pedagógico recomendado.
 
 | # | Archivo | Concepto | Tiempo aprox. |
 |---|---------|----------|--------------|
@@ -124,7 +124,7 @@ Esta es la parte pedagógica del taller. Cada TODO introduce un concepto clave d
 | 9 | `terraform/seguridad.tf` | Reglas de ingreso en SG para puertos `:9093` y `:3100` | 5 min |
 | 10 | `terraform/user_data/monitoring.sh` | Discusión: Docker vs binarios en bootstrap | — |
 
-Tras cada TODO que modifique configuración del stack, vuelve a aplicar:
+Tras cada ejercicio que modifique configuración del stack, vuelve a aplicar:
 
 ```bash
 make provision
@@ -132,7 +132,7 @@ make provision
 ansible-playbook -i ansible/inventario_terraform.yaml ansible/site.yaml --tags <rol>
 ```
 
-Para los TODO #2 y #3, las IPs de los targets ya están inyectadas automáticamente desde el remote state de Terraform (se pueden ver con `terraform -chdir=terraform output`).
+Para los ejercicios #2 y #3, las IPs de los targets ya están inyectadas automáticamente desde el remote state de Terraform (se pueden ver con `terraform -chdir=terraform output`).
 
 ---
 

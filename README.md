@@ -98,7 +98,7 @@ taller-observabilidad/
 │   ├── state.tf               # remote state del stack de apps
 │   ├── variables.tf           # parámetros configurables
 │   └── user_data/
-│       └── monitoring.sh      # bootstrap cloud-init (TODO #10 — discusión)
+│       └── monitoring.sh      # bootstrap cloud-init — discusión Docker vs binarios
 ├── ansible/
 │   ├── site.yaml              # playbook principal (7 roles)
 │   ├── group_vars/
@@ -106,12 +106,12 @@ taller-observabilidad/
 │   ├── inventario_terraform.yaml  # generado por Terraform — no editar
 │   └── roles/
 │       ├── common/            # apt upgrade, usuario observability, grupo systemd-journal
-│       ├── node_exporter/     # v1.11.1 — TODO #1
-│       ├── prometheus/        # v3.11.0 — TODOs #2 #3 #8
-│       ├── loki/              # v3.6.10 — TODO #5
-│       ├── grafana/           # v13.0.1 — TODO #4
-│       ├── alertmanager/      # v0.32.0 — TODO #7
-│       └── promtail/          # v3.6.10 — TODO #6
+│       ├── node_exporter/     # v1.11.1 — checksum + get_url + systemd
+│       ├── prometheus/        # v3.11.0 — file_sd + targets + alertas
+│       ├── loki/              # v3.6.10 — storage + retención
+│       ├── grafana/           # v13.0.1 — panel PromQL CPU
+│       ├── alertmanager/      # v0.32.0 — route + receptor
+│       └── promtail/          # v3.6.10 — journal + syslog
 ├── Docs/
 │   ├── Quickstart.md          # guía paso a paso para alumnos
 │   ├── targets.md             # instalación manual de exporters en el webstack
@@ -124,19 +124,19 @@ taller-observabilidad/
 
 ## Los 7 roles de Ansible
 
-| Rol             | Puerto | Versión  | Concepto del TODO         |
-|-----------------|--------|----------|---------------------------|
-| `common`        | —      | —        | Sistema base y usuario     |
-| `node_exporter` | 9100   | 1.11.1   | TODO #1: checksum + systemd |
-| `prometheus`    | 9090   | 3.11.0   | TODOs #2 #3 #8: file_sd + targets + alertas |
-| `loki`          | 3100   | 3.6.10   | TODO #5: storage + retención |
-| `grafana`       | 3000   | 13.0.1   | TODO #4: panel PromQL CPU  |
-| `alertmanager`  | 9093   | 0.32.0   | TODO #7: route + receptor  |
-| `promtail`      | —      | 3.6.10   | TODO #6: journal + syslog  |
+| Rol             | Puerto | Versión  | Concepto principal                           |
+|-----------------|--------|----------|----------------------------------------------|
+| `common`        | —      | —        | Sistema base, usuario y grupo del sistema     |
+| `node_exporter` | 9100   | 1.11.1   | Checksum SHA256 + get_url + servicio systemd  |
+| `prometheus`    | 9090   | 3.11.0   | scrape_configs con file_sd + targets + alertas |
+| `loki`          | 3100   | 3.6.10   | Almacenamiento filesystem + retención 7 días  |
+| `grafana`       | 3000   | 13.0.1   | Panel PromQL de uso de CPU                    |
+| `alertmanager`  | 9093   | 0.32.0   | Route + receptor de notificaciones (webhook)  |
+| `promtail`      | —      | 3.6.10   | positions + clients + scrape de journal/syslog |
 
 ---
 
-## Los 10 TODO pedagógicos
+## Ejercicios del taller
 
 | #  | Archivo                                                        | Concepto                              |
 |----|----------------------------------------------------------------|---------------------------------------|

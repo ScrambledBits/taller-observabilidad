@@ -22,7 +22,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 ### Changed
 - `Docs/targets.md`: eliminado voseo residual (Anotá→Anota, preferís→prefieres, Conectate→Conéctate, Verificá→Verifica, Editá→Edita, Agregá→Agrega, Reemplazá→Reemplaza); corregido "Asumción" por "Asunción"
 - `Docs/troubleshooting.md`: agregada sección "Diagnóstico rápido" al inicio con secuencia de verificación de cuatro pasos
-- `Docs/Quickstart.md`: agregada subsección "Credenciales AWS" con opciones A/B (variables de entorno y perfil nombrado); tabla de TODOs con columna "Tiempo aprox." más descriptiva; tono unificado
+- `Docs/Quickstart.md`: agregada subsección "Credenciales AWS" con opciones A/B (variables de entorno y perfil nombrado); tabla de ejercicios con columna "Tiempo aprox." más descriptiva; tono unificado
 - `README.md`: agregada sección "Credenciales AWS" con instrucciones de configuración antes de la sección de licencia
 
 ---
@@ -44,7 +44,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 ## [1.0.0] — 2026-04-23
 
 ### Added
-- Implementación de referencia completa con los 10 TODOs pedagógicos resueltos
+- Implementación de referencia completa con los 10 ejercicios pedagógicos implementados
 - Rol `node_exporter` v1.11.1: descarga con `get_url`, verificación de checksum, servicio systemd
 - Rol `prometheus` v3.11.0: `scrape_configs` con `file_sd`, reglas de alerta (HighCPU, InstanciaInaccesible, AltaMemoria), targets dinámicos vía Jinja2
 - Rol `loki` v3.6.10: almacenamiento filesystem, esquema v13, retención 7 días
@@ -67,4 +67,4 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 - Scaffold inicial: estructura terraform + ansible + Docs
 - Terraform: VPC, EC2 t3.small, SGs para :9090 :3000 :9093 :3100, key pair RSA-4096, remote state
 - `Makefile` con targets: `inventario`, `ping`, `provision`, `open`, `tf-destroy`, `ayuda`
-- `README.md` con arquitectura, quick start y tabla de TODOs pedagógicos
+- `README.md` con arquitectura, quick start y tabla de ejercicios pedagógicos
