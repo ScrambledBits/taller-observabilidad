@@ -43,6 +43,7 @@ skip-check:
   - CKV_AWS_126  # EC2 detailed monitoring desactivado — costo innecesario en entrenamiento
   - CKV_AWS_135  # EBS optimized — t3.small es EBS-optimized por defecto; falso positivo de Checkov
   - CKV_AWS_8    # EBS sin cifrado — costo de gestión innecesario para entorno educativo
+  - CKV2_AWS_41  # IAM role no asociado a EC2 — el nodo de monitoreo no accede a servicios AWS
 
   # ── Falsos positivos ──────────────────────────────────────────────────────
   - CKV_AWS_386  # WhoAMI: data.aws_ami ya filtra por owners = ["099720109477"] (Canonical)
