@@ -6,36 +6,43 @@ After=network.target
 Type=simple
 User={{ prometheus_user }}
 
+# ExecStart: comando para iniciar Prometheus. Flags:
+#   --config.file       → archivo de configuración principal (targets, alertmanager, reglas)
+#   --storage.tsdb.path → directorio de la TSDB (Time Series Database), el motor de
+#                         almacenamiento de Prometheus. Optimizado para series de tiempo;
+#                         almacena los datos en bloques de 2h que se compactan periódicamente.
+#   --storage.tsdb.retention.time → cuánto tiempo conservar datos. 15d ≈ 170MB con 200 series
+#                         (estimación: ~2-3 bytes/muestra × 4 muestras/min × 200 series × 15d)
+#   --web.listen-address → puerto HTTP donde escucha la UI y la API de Prometheus
+#   --web.enable-lifecycle → habilita endpoints de gestión en tiempo real:
+#                            POST /-/reload → recarga prometheus.yml sin reiniciar el proceso
+#                                            (lo usan los handlers de Ansible)
+#                            POST /-/quit   → apaga Prometheus limpiamente
+#     ADVERTENCIA: sin autenticación, cualquier cliente con acceso al puerto puede hacer reload.
+#     En el taller (SG abierto a 0.0.0.0/0) es un riesgo aceptable.
+#     En producción: restringir el SG a IPs del equipo de ops o añadir autenticación básica.
 ExecStart={{ install_dir }}/prometheus \
-  # Archivo de configuración principal. Define los targets, reglas, y el alertmanager.
   --config.file={{ prometheus_config_dir }}/prometheus.yml \
-  # Directorio donde Prometheus almacena las series de tiempo (TSDB).
-  # TSDB (Time Series Database) es la base de datos interna de Prometheus,
-  # optimizada para datos con timestamp. Almacena los datos en bloques de 2h.
   --storage.tsdb.path={{ prometheus_data_dir }} \
-  # Cuánto tiempo conservar los datos. 15d = 15 días.
-  # Calcular espacio necesario: ~2-3 bytes por muestra × muestras/segundo × 86400s × 15días.
-  # Con 200 series y scrape cada 15s: ~200 × 4 muestras/min × 60min × 24h × 15d ≈ 170MB
   --storage.tsdb.retention.time=15d \
-  # Puerto en el que escucha la interfaz web y la API de Prometheus.
   --web.listen-address=":{{ prometheus_port }}" \
-  # IMPORTANTE: habilita los endpoints HTTP de gestión:
-  #   POST /-/reload  → recarga la configuración sin reiniciar (lo usan los handlers)
-  #   POST /-/quit    → apaga Prometheus limpiamente
-  # ADVERTENCIA: sin autenticación, cualquiera con acceso al puerto puede hacer reload.
-  # En el taller (SG abierto a 0.0.0.0/0) esto es un riesgo aceptable.
-  # En producción: restringir el SG o añadir autenticación básica.
   --web.enable-lifecycle
 
-# ExecReload: comando ejecutado cuando systemd recibe una señal de reload
-# (por ejemplo, al correr `systemctl reload prometheus`).
+# ExecReload: comando ejecutado al recibir `systemctl reload prometheus`.
 # SIGHUP es la señal Unix tradicional de "recarga configuración".
-# Prometheus la interpreta como: vuelve a leer prometheus.yml sin reiniciarse.
+# Prometheus la interpreta como: vuelve a leer prometheus.yml sin interrumpir scraping.
 # $MAINPID es la variable de systemd con el PID del proceso principal.
 ExecReload=/bin/kill -HUP $MAINPID
 
+# Restart=on-failure: systemd reiniciará el proceso si termina con código de error > 0.
+# Cubre crashes o errores inesperados. No reinicia si se detiene con `systemctl stop`.
 Restart=on-failure
+# RestartSec: espera 5 segundos antes de reintentar el arranque.
+# Evita que un servicio en crash loop consuma todos los recursos del sistema.
 RestartSec=5s
 
 [Install]
+# WantedBy=multi-user.target: el servicio arranca automáticamente cuando el sistema
+# alcanza el modo multiusuario (nivel de ejecución 3 en SysV): modo normal de servidor,
+# sin interfaz gráfica. Es el target estándar para servicios de red en Linux.
 WantedBy=multi-user.target

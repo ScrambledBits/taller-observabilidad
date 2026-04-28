@@ -24,7 +24,14 @@ jobs:
   planificar:
     name: Terraform Plan
     runs-on: ubuntu-latest
+    # environment: production → aplica las reglas de protección configuradas en
+    # GitHub → Settings → Environments → production. Permite exigir aprobación
+    # manual de revisores antes de que el job empiece y restringir qué ramas
+    # pueden usar los secrets de AWS. Sin este gate, cualquier push podría
+    # accidentalmente ejecutar terraform plan con credenciales de producción.
     environment: production
+    # if: filtra la ejecución. Solo corre si se escribió exactamente "planificar".
+    # Previene ejecuciones accidentales por errores tipográficos en el input.
     if: github.event.inputs.confirmacion == 'planificar'
     defaults:
       run:

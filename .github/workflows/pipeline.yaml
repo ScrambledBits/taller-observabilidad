@@ -93,6 +93,12 @@ jobs:
   # ── Job 3: Lint de Ansible ──────────────────────────────────────────────────
   # Verifica los 7 roles (common, node_exporter, prometheus, loki, grafana,
   # alertmanager, promtail) con el perfil 'basic' definido en .ansible-lint.yaml.
+  #
+  # Sin 'working-directory': ansible-lint debe correr desde la raíz del proyecto
+  # para resolver los paths relativos definidos en .ansible-lint.yaml (como
+  # ansible/inventario_terraform.yaml en exclude_paths). A diferencia del job de
+  # Terraform, que usa todos sus comandos dentro de ./terraform/, ansible-lint
+  # necesita ver la estructura completa del repositorio.
   validar-ansible:
     name: Revisar el código Ansible
     runs-on: ubuntu-latest

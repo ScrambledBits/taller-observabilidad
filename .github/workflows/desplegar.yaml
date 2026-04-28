@@ -25,7 +25,11 @@ jobs:
   desplegar:
     name: Terraform Apply + Ansible
     runs-on: ubuntu-latest
+    # environment: production → aplica las reglas de protección del environment de GitHub.
+    # Permite exigir aprobación manual antes de aplicar cambios destructivos en AWS.
+    # Configurable en: GitHub → Settings → Environments → production.
     environment: production
+    # if: solo ejecuta si se escribió exactamente "aplicar". Previene ejecuciones accidentales.
     if: github.event.inputs.confirmacion == 'aplicar'
     defaults:
       run:

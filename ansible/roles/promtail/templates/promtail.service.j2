@@ -14,8 +14,12 @@ ExecStart={{ install_dir }}/promtail -config.file={{ promtail_config_dir }}/prom
 # inaccesibles y Promtail no podría recolectar los logs.
 # El usuario "observability" + grupo "systemd-journal" (configurado en el rol common)
 # proporcionan el nivel de acceso mínimo necesario.
+
+# Restart=on-failure: systemd reiniciará el proceso si termina con código de error > 0.
 Restart=on-failure
+# RestartSec: espera 5 segundos antes de reintentar para evitar crash loops.
 RestartSec=5s
 
 [Install]
+# WantedBy=multi-user.target: arranca automáticamente en el modo normal de servidor.
 WantedBy=multi-user.target

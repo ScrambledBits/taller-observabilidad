@@ -10,12 +10,16 @@ User={{ loki_user }}
 # Loki usa "-config.file" con UN SOLO guión, no "--config.file".
 # Esto es una convención de algunas aplicaciones escritas en Go que usan
 # el paquete estándar "flag" en lugar de bibliotecas como cobra o urfave/cli.
-# Ambos (- y --) son equivalentes en aplicaciones Go que usan el paquete "flag",
+# Ambos (- y --) son equivalentes en aplicaciones Go con el paquete "flag",
 # pero la convención de Loki es usar un solo guión.
 ExecStart={{ install_dir }}/loki -config.file={{ loki_config_dir }}/loki-config.yaml
 
+# Restart=on-failure: systemd reiniciará el proceso si termina con código de error > 0.
 Restart=on-failure
+# RestartSec: espera 5 segundos antes de reintentar para evitar crash loops.
 RestartSec=5s
 
 [Install]
+# WantedBy=multi-user.target: arranca automáticamente en el modo normal de servidor
+# (sin interfaz gráfica). Es el target estándar para servicios de red en Linux.
 WantedBy=multi-user.target

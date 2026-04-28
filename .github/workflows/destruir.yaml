@@ -26,7 +26,12 @@ jobs:
   destruir:
     name: Terraform Destroy
     runs-on: ubuntu-latest
+    # environment: production → aplica las reglas de protección del environment de GitHub.
+    # Para una operación irreversible como destroy, se recomienda configurar revisores
+    # obligatorios en GitHub → Settings → Environments → production.
     environment: production
+    # if: solo ejecuta si se escribió exactamente "destruir". Barrera intencional
+    # contra ejecuciones accidentales de una operación irreversible.
     if: github.event.inputs.confirmacion == 'destruir'
     defaults:
       run:
