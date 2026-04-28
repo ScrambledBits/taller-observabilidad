@@ -1,0 +1,55 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Workflow para destruir TODA la infraestructura de monitoreo.
+#
+# ADVERTENCIA: Esta acción es IRREVERSIBLE. Elimina:
+#   - La instancia EC2 de monitoreo y TODOS sus datos (métricas, logs, dashboards)
+#   - El Security Group, el Key Pair SSH
+#   - El estado de Terraform en S3 NO se elimina (puede re-desplegarse)
+#
+# USO PREVISTO: Apagar el entorno al terminar el taller para no consumir créditos AWS.
+# La EC2 genera cargos por hora aunque no haya tráfico activo.
+#
+# CÓMO EJECUTAR:
+#   GitHub → Actions → "Destruir infraestructura" → Run workflow → escribir "destruir"
+
+name: Destruir infraestructura
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escribe "destruir" para confirmar la eliminación permanente'
+        required: true
+
+jobs:
+  destruir:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event.inputs.confirmacion == 'destruir'
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.9"
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -input=false

@@ -1,0 +1,68 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Workflow manual para desplegar la infraestructura de monitoreo.
+# Ejecuta terraform apply y, al terminar, Ansible configura el servidor (7 roles).
+#
+# PRERREQUISITO: El stack de aplicaciones (taller-iac) debe estar desplegado.
+#
+# ANSIBLE EN CI: aprovisionamiento.tf usa local-exec para llamar ansible-playbook.
+# Esto significa que el RUNNER de GitHub Actions actúa como nodo de control de Ansible
+# y se conecta vía SSH al EC2 recién creado. Por eso este job instala Ansible.
+#
+# CÓMO EJECUTAR:
+#   GitHub → Actions → "Desplegar infraestructura" → Run workflow → escribir "aplicar"
+
+name: Desplegar infraestructura
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escribe "aplicar" para ejecutar terraform apply'
+        required: true
+
+jobs:
+  desplegar:
+    name: Terraform Apply + Ansible
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event.inputs.confirmacion == 'aplicar'
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.9"
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar Ansible
+        run: pip install "ansible-core>=2.20"
+
+      - name: Verificar ansible-playbook
+        run: ansible-playbook --version
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Crear plan
+        run: terraform plan -no-color -input=false -out=pipeline.tfplan
+
+      - name: Aplicar el plan
+        run: terraform apply -auto-approve pipeline.tfplan

@@ -1,8 +1,51 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Variables con precedencia baja (defaults) del rol prometheus.
+# Pueden sobreescribirse sin modificar el rol.
+#
+# La prioridad de variables en Ansible, de menor a mayor:
+#   defaults del rol  →  vars del rol  →  group_vars  →  host_vars  →  --extra-vars
+#
+# Varias variables aquí referencian valores de group_vars/all.yaml
+# (observability_user, data_base, prometheus_version, arch).
+#
+# VARIABLES INYECTADAS POR TERRAFORM (no definidas aquí):
+#   frontend_target_ip  →  IP del nodo frontend (nginx). Se lee del inventario
+#                          generado por Terraform (ansible/inventario_terraform.yaml).
+#                          Ver: terraform/aprovisionamiento.tf → local_file.ansible_inventory
+#   backend_target_ip   →  IP del nodo backend (Flask). Mismo origen.
+#   Estas IPs se usan en las templates targets_infra.yaml.j2 y targets_apps.yaml.j2
+#   para que Prometheus sepa qué hosts scrapear.
+
+# prometheus_user: usuario del sistema operativo bajo el que corre el proceso.
 prometheus_user: "{{ observability_user }}"
+
+# prometheus_port: puerto en el que Prometheus expone su UI y API.
+# 9090 es el puerto oficial. Acceder a http://<ip>:9090 para la UI de Prometheus.
 prometheus_port: 9090
+
+# prometheus_config_dir: directorio de configuración de Prometheus.
+# /etc/prometheus sigue la convención FHS para archivos de configuración del sistema.
+# Contiene prometheus.yml y el subdirectorio rules/ con las reglas de alerta.
 prometheus_config_dir: /etc/prometheus
+
+# prometheus_data_dir: directorio donde Prometheus almacena su base de datos TSDB.
+# TSDB (Time Series Database) es el motor de almacenamiento nativo de Prometheus.
+# Los datos se organizan en bloques de 2 horas compactados periódicamente.
+# En producción este directorio va en un volumen dedicado para evitar llenar el disco raíz.
 prometheus_data_dir: "{{ data_base }}/prometheus"
+
+# prometheus_url: URL de descarga del binario desde GitHub Releases.
+# El archivo incluye dos binarios: 'prometheus' (el servidor) y 'promtool' (CLI de utilidades).
+# La URL se construye dinámicamente desde prometheus_version y arch (en group_vars/all.yaml).
 prometheus_url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.{{ arch }}.tar.gz"
+
+# prometheus_scrape_interval: frecuencia con que Prometheus consulta (scrapea) cada target.
+# 15s es el valor estándar recomendado. Valores más bajos (5s) aumentan la resolución
+# pero incrementan la carga de red, CPU y almacenamiento tanto en Prometheus como en los targets.
 prometheus_scrape_interval: 15s
+
+# prometheus_evaluation_interval: frecuencia con que Prometheus evalúa las reglas de alerta.
+# Debe ser igual o múltiplo de scrape_interval para que las reglas evalúen datos actualizados.
+# Con 15s se evalúan las alertas cada 15 segundos — suficiente para el taller.
 prometheus_evaluation_interval: 15s

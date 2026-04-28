@@ -1,0 +1,112 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Pipeline de CI/CD para el taller de Observabilidad de BootcampPeru.
+#
+# ESTRUCTURA: 3 jobs de validación que corren en paralelo en cada push y PR.
+# NO hay terraform plan ni terraform apply automáticos en este pipeline.
+#
+# RAZÓN: Este proyecto lee estado remoto de Terraform del stack de aplicaciones
+# (taller-iac / bootcamperu.tfstate). terraform plan requiere que ese stack esté
+# desplegado para resolver las referencias cruzadas (VPC ID, subnets, SGs).
+# Por eso, plan y apply son pasos manuales independientes.
+#
+# Para ejecutar plan/apply/destroy manualmente:
+#   GitHub Actions → planificar.yaml / desplegar.yaml / destruir.yaml
+
+name: Pipeline IaC Observabilidad
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Cancela ejecuciones anteriores en la misma rama para evitar runs simultáneos.
+# Dos 'terraform apply' al mismo tiempo sobre el mismo estado pueden corromperse.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── Job 1: Lint de Terraform ────────────────────────────────────────────────
+  # Usa -backend=false: descarga providers del registry público sin conectarse
+  # al backend S3 ni resolver el estado remoto cruzado. No necesita credenciales AWS.
+  validar-terraform:
+    name: Revisar el código Terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.9"
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init (sin backend)
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      # setup-tflint@v4 es la versión major correcta. @v6 NO existe para esta action.
+      - name: Instalar TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.61.0
+
+      - name: TFLint Init
+        run: tflint --config=.tflint.hcl --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: TFLint Run
+        run: tflint --config=.tflint.hcl -f compact
+
+  # ── Job 2: Escaneo de seguridad de Terraform ────────────────────────────────
+  # Lee .checkov.yaml (en la raíz del repo) para las exclusiones documentadas.
+  # bridgecrewio/checkov-action@v12 puede instalar una versión más nueva de Checkov
+  # que la local. Si aparecen nuevas fallas en CI, añadirlas al skip-check list
+  # con el ID y una justificación.
+  escanear-terraform:
+    name: Escanear seguridad de Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          config_file: .checkov.yaml
+
+  # ── Job 3: Lint de Ansible ──────────────────────────────────────────────────
+  # Verifica los 7 roles (common, node_exporter, prometheus, loki, grafana,
+  # alertmanager, promtail) con el perfil 'basic' definido en .ansible-lint.yaml.
+  validar-ansible:
+    name: Revisar el código Ansible
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar ansible-lint
+        run: pip install "ansible-lint[community,yamllint]" "ansible-core>=2.20"
+
+      - name: Ejecutar ansible-lint
+        run: ansible-lint ansible/site.yaml

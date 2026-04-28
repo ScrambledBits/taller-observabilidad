@@ -1,0 +1,51 @@
+# Configuración de Checkov para análisis de seguridad estático de Terraform.
+# Checkov escanea los archivos .tf buscando configuraciones inseguras sin
+# conectarse a AWS ni ejecutar terraform plan.
+#
+# NOTA IMPORTANTE sobre claves YAML: Checkov requiere guiones (soft-fail, skip-check),
+# NO guiones bajos (soft_fail, skip_check). Usar guiones bajos resulta en flags
+# ignorados silenciosamente.
+#
+# Ejecutar localmente:
+#   checkov --config-file .checkov.yaml
+#
+# Verificar qué checks pasaron/fallaron:
+#   checkov --config-file .checkov.yaml 2>&1 | grep -E "Passed|Failed"
+
+soft-fail: false
+
+directory:
+  - terraform
+
+framework:
+  - terraform
+
+# Speeds up local runs and CI significantly. Without this flag, Checkov downloads
+# provider schemas on every run (30-60 seconds on slow networks).
+download-external-modules: false
+
+# Reglas omitidas intencionalmente para el entorno de taller educativo.
+# Revisar esta lista antes de usar el proyecto en producción.
+skip-check:
+  # ── Security Group: acceso desde 0.0.0.0/0 ────────────────────────────────
+  # Los puertos de monitoreo están abiertos para que los alumnos accedan
+  # desde sus máquinas durante el taller (IPs dinámicas y variadas).
+  # En producción restringir a IPs de la organización o usar VPN.
+  - CKV_AWS_24   # SSH desde 0.0.0.0/0 — necesario para acceso SSH en el taller
+  - CKV_AWS_25   # Regla genérica de ingreso abierto (RDP/cualquier puerto)
+  - CKV_AWS_260  # Regla genérica de ingreso abierto (HTTP/cualquier puerto)
+  - CKV_AWS_277  # Regla genérica de ingreso abierto (cualquier protocolo)
+  - CKV_AWS_382  # Egreso abierto a 0.0.0.0/0 — necesario para apt-get, GitHub y webhooks
+
+  # ── Instancia EC2: configuraciones relajadas para el taller ───────────────
+  - CKV_AWS_79   # IMDSv1 habilitado — documentado en instancias.tf; simplifica el taller
+  - CKV_AWS_88   # IP pública en EC2 — necesaria para que alumnos accedan a las UIs
+  - CKV_AWS_126  # EC2 detailed monitoring desactivado — costo innecesario en entrenamiento
+  - CKV_AWS_135  # EBS optimized — t3.small es EBS-optimized por defecto; falso positivo de Checkov
+  - CKV_AWS_8    # EBS sin cifrado — costo de gestión innecesario para entorno educativo
+  - CKV2_AWS_41  # IAM role no asociado a EC2 — el nodo de monitoreo no accede a servicios AWS
+
+  # ── Falsos positivos ──────────────────────────────────────────────────────
+  - CKV_AWS_386  # WhoAMI: data.aws_ami ya filtra por owners = ["099720109477"] (Canonical)
+  - CKV_AWS_41   # Credenciales hardcodeadas en provider — false positive: usa env vars / AWS profile
+  - CKV_AWS_46   # Secretos en user_data — false positive: monitoring.sh no contiene secretos

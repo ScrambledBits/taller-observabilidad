@@ -35,6 +35,7 @@ resource "aws_security_group" "taller_observabilidad_bootcamperu_prometheus" {
 # Los alumnos acceden desde el browser para ver targets, métricas, y alertas activas.
 resource "aws_vpc_security_group_ingress_rule" "permitir_http_prometheus" {
   security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  description       = "Prometheus UI — acceso desde navegador en el taller"
   cidr_ipv4         = "0.0.0.0/0" # Taller: abierto. Producción: restringir a IPs conocidas.
   from_port         = 9090
   ip_protocol       = "tcp"
@@ -45,20 +46,24 @@ resource "aws_vpc_security_group_ingress_rule" "permitir_http_prometheus" {
 # Grafana es la interfaz principal que usarán los alumnos durante el taller.
 resource "aws_vpc_security_group_ingress_rule" "permitir_http_grafana" {
   security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  description       = "Grafana UI — interfaz principal del taller"
   cidr_ipv4         = "0.0.0.0/0"
   from_port         = 3000
   ip_protocol       = "tcp"
   to_port           = 3000
 }
 
-# TODO(taller): #9 — Reglas de ingreso para Alertmanager y Loki
-# (Ya implementadas — este TODO servía para que los alumnos las completaran)
+# Nota pedagógica: en una versión anterior del taller, los alumnos agregaban estas reglas
+# como ejercicio. El ejercicio enseñaba la diferencia entre declarar la infraestructura
+# (Terraform) y configurar el software (Ansible): ambos pasos son necesarios para que
+# el servicio sea accesible desde el exterior.
 
 # Regla de ingreso para Alertmanager (puerto 9093)
 # Alertmanager recibe alertas de Prometheus y las envía a los receptores configurados.
 # Los alumnos pueden ver las alertas activas y crear silences desde la UI.
 resource "aws_vpc_security_group_ingress_rule" "permitir_alertmanager" {
   security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  description       = "Alertmanager UI — gestión de alertas y silenciamientos"
   cidr_ipv4         = "0.0.0.0/0"
   from_port         = 9093
   ip_protocol       = "tcp"
@@ -74,6 +79,7 @@ resource "aws_vpc_security_group_ingress_rule" "permitir_alertmanager" {
 # También permite consultar logs directamente via API de Loki.
 resource "aws_vpc_security_group_ingress_rule" "permitir_loki" {
   security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  description       = "Loki API — recibe logs de Promtail y targets externos"
   cidr_ipv4         = "0.0.0.0/0"
   from_port         = 3100
   ip_protocol       = "tcp"
@@ -92,6 +98,7 @@ resource "aws_vpc_security_group_ingress_rule" "permitir_loki" {
 #   - Enviar notificaciones al webhook de Alertmanager
 resource "aws_vpc_security_group_egress_rule" "permitir_todo_egress" {
   security_group_id = aws_security_group.taller_observabilidad_bootcamperu_prometheus.id
+  description       = "Egreso total — necesario para apt, GitHub y webhooks"
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
 }

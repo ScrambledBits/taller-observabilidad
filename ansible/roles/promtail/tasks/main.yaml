@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Promtail es el agente de recolección de logs. Lee logs del servidor donde corre
 # y los envía a Loki en batches comprimidos.

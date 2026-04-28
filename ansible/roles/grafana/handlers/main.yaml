@@ -1,4 +1,20 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Handlers del rol grafana.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true).
+#
+# NOTA: Grafana no soporta hot-reload de configuración. Cualquier cambio
+# en los datasources, dashboards o configuración de Grafana requiere un reinicio
+# del proceso para que los cambios surtan efecto.
+# El provisioning automático (datasources, dashboards via archivos) sí funciona
+# en el arranque, pero los cambios posteriores requieren reinicio.
+
+# reiniciar grafana: reinicio completo del proceso Grafana.
+# El nombre del servicio systemd es 'grafana-server' (no 'grafana') porque así
+# lo registra el paquete oficial de Grafana OSS instalado vía APT.
+# 'daemon_reload: true' asegura que systemd usa la unidad actualizada.
 - name: reiniciar grafana
   ansible.builtin.systemd:
     name: grafana-server

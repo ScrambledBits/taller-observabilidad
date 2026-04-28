@@ -1,10 +1,8 @@
-# TODO(taller): #2 — scrape_configs con file_sd para service discovery dinámico
-#
-# Este archivo es la configuración principal de Prometheus. Controla:
+# Configuración principal de Prometheus. Controla:
 #   - Con qué frecuencia recolecta métricas (scrape_interval)
 #   - Con qué frecuencia evalúa las reglas de alerta (evaluation_interval)
-#   - De dónde recolecta métricas (scrape_configs)
-#   - Dónde envía las alertas (alerting)
+#   - De dónde recolecta métricas (scrape_configs con file_sd)
+#   - Dónde envía las alertas (alerting → Alertmanager)
 #   - Qué reglas de alerta carga (rule_files)
 #
 # El archivo se renderiza como plantilla Jinja2: cada {{ variable }} se reemplaza
@@ -66,8 +64,6 @@ scrape_configs:
         replacement: "{{ ansible_hostname }}"
 
   # --- TARGET 3: file_sd (file-based Service Discovery) para infraestructura ---
-  # TODO(taller): completar este bloque junto con el archivo targets_infra.yaml.j2
-  #
   # ¿Qué es file_sd?
   # En lugar de listar los targets directamente aquí (static_configs), apuntamos
   # a un ARCHIVO que contiene la lista de targets. Ventajas:

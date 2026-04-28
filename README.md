@@ -163,6 +163,26 @@ taller-observabilidad/
 
 ---
 
+## Credenciales AWS
+
+El instructor proporcionará credenciales temporales antes de comenzar. Configúralas en tu terminal:
+
+```bash
+# Opción A — variables de entorno
+export AWS_ACCESS_KEY_ID="<clave>"
+export AWS_SECRET_ACCESS_KEY="<secreto>"
+export AWS_DEFAULT_REGION="us-east-1"
+
+# Opción B — perfil nombrado
+aws configure --profile taller
+export AWS_PROFILE=taller
+
+# Verificar
+aws sts get-caller-identity
+```
+
+---
+
 ## Licencia
 
 MIT — material pedagógico. Sin garantías. No usar en producción sin hardening adicional (TLS, autenticación, backups, restricción de IPs en SGs).

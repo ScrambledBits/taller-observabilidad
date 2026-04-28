@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Variables globales del taller de observabilidad.
 # Estas variables están disponibles para TODOS los roles (son "group vars" del grupo "all").

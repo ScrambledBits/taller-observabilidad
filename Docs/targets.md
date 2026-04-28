@@ -2,7 +2,7 @@
 
 Este repo monitorea el proyecto `webstack-bootcamp` (frontend nginx + backend Flask en AWS). Esta guía explica **paso a paso** cómo preparar ambas instancias para que Prometheus pueda scrapear sus métricas y Loki recibir sus logs.
 
-> **Asumción**: el stack de apps ya está desplegado con `terraform apply` en `webstack-bootcamp/taller/terraform`. Si no, hacerlo primero.
+> **Asunción**: el stack de apps ya está desplegado con `terraform apply` en `webstack-bootcamp/taller/terraform`. Si no, hazlo primero.
 
 ---
 
@@ -15,7 +15,7 @@ cd /ruta/a/webstack-bootcamp/taller/terraform
 terraform output
 ```
 
-Anotá los valores:
+Anota los valores:
 
 ```
 frontend_public_ip = "3.x.x.x"       # IP pública del frontend (nginx)
@@ -36,7 +36,7 @@ terraform output -raw frontend_ssh_command | bash
 terraform output -raw backend_ssh_command | bash
 ```
 
-Si preferís construir el comando manualmente, **es importante usar `-o ProxyCommand=` en lugar de `-o ProxyJump=`**. ProxyJump no siempre propaga la clave `-i` al host de salto dependiendo de la versión de OpenSSH y del estado del agente SSH; ProxyCommand con `-W` sí lo hace de forma explícita:
+Si prefieres construir el comando manualmente, **es importante usar `-o ProxyCommand=` en lugar de `-o ProxyJump=`**. ProxyJump no siempre propaga la clave `-i` al host de salto dependiendo de la versión de OpenSSH y del estado del agente SSH; ProxyCommand con `-W` sí lo hace de forma explícita:
 
 ```bash
 KEY="/ruta/a/webstack-bootcamp/taller/terraform/taller.pem"
@@ -182,7 +182,7 @@ curl -s http://localhost:9100/metrics | head -5
 
 ## 2. Instalar node_exporter en el backend
 
-Conectate al backend usando ProxyCommand (ver sección 0 para el comando completo):
+Conéctate al backend usando ProxyCommand (ver sección 0 para el comando completo):
 
 ```bash
 KEY="/ruta/a/webstack-bootcamp/taller/terraform/taller.pem"
@@ -320,7 +320,7 @@ sudo systemctl enable --now nginx-prometheus-exporter
 curl -s http://localhost:9113/metrics | grep nginx_
 ```
 
-> Verificá la última versión de nginx-prometheus-exporter en https://github.com/nginxinc/nginx-prometheus-exporter/releases
+> Verifica la última versión de nginx-prometheus-exporter en https://github.com/nginxinc/nginx-prometheus-exporter/releases
 
 ---
 
@@ -338,20 +338,20 @@ pip3 install prometheus_client
 
 ### 4.2 Agregar métricas a app.py
 
-Editá `/opt/webstack-app/app.py` para agregar el endpoint `/metrics`:
+Edita `/opt/webstack-app/app.py` para agregar el endpoint `/metrics`:
 
 ```bash
 sudo nano /opt/webstack-app/app.py
 ```
 
-Agregá estas importaciones al inicio del archivo:
+Agrega estas importaciones al inicio del archivo:
 
 ```python
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 import time
 ```
 
-Agregá las métricas después de `app = Flask(__name__)`:
+Agrega las métricas después de `app = Flask(__name__)`:
 
 ```python
 REQUESTS = Counter(
@@ -378,7 +378,7 @@ def _registrar_metrica(resp):
     return resp
 ```
 
-Agregá el endpoint `/metrics` junto a los otros routes:
+Agrega el endpoint `/metrics` junto a los otros routes:
 
 ```python
 @app.route("/metrics")
@@ -417,7 +417,7 @@ sudo usermod -aG systemd-journal promtail
 
 sudo mkdir -p /etc/promtail /var/lib/promtail
 
-# Reemplazá MONITORING_PRIVATE_IP con la IP privada del nodo de monitoreo
+# Reemplaza MONITORING_PRIVATE_IP con la IP privada del nodo de monitoreo
 # (obtenida con: cd <repo-observabilidad>/terraform && terraform output monitoring_private_ip)
 MONITORING_PRIVATE_IP="<PEGAR_IP_PRIVADA_DEL_NODO_MONITOREO>"
 HOSTNAME=$(hostname)

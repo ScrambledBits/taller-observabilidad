@@ -1,6 +1,41 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Variables con precedencia baja (defaults) del rol promtail.
+# Pueden sobreescribirse sin modificar el rol.
+#
+# La prioridad de variables en Ansible, de menor a mayor:
+#   defaults del rol  →  vars del rol  →  group_vars  →  host_vars  →  --extra-vars
+#
+# NOTA IMPORTANTE sobre versiones: Promtail y Loki comparten repositorio y ciclo de releases.
+# La variable promtail_version siempre debe coincidir con loki_version (definida en
+# group_vars/all.yaml). Si las versiones difieren, pueden aparecer errores de compatibilidad
+# en el protocolo de push de logs.
+
+# promtail_user: usuario del sistema operativo bajo el que corre Promtail.
+# IMPORTANTE: este usuario debe ser miembro del grupo 'systemd-journal' para poder
+# leer los logs del journal de systemd. Ver: roles/common/tasks/main.yaml → tarea de grupos.
 promtail_user: "{{ observability_user }}"
+
+# promtail_http_port: puerto HTTP de Promtail para métricas propias y health check.
+# 9080 es el puerto por defecto. Se puede consultar http://<host>:9080/metrics
+# para ver las métricas de Promtail (líneas procesadas, errores, etc.).
+# No es necesario abrirlo en el Security Group (solo uso interno).
 promtail_http_port: 9080
+
+# promtail_config_dir: directorio de configuración de Promtail.
 promtail_config_dir: /etc/promtail
+
+# promtail_positions_dir: directorio donde Promtail guarda el archivo positions.yaml.
+# positions.yaml registra hasta qué byte/línea ha llegado Promtail en cada archivo
+# de logs. Esto garantiza:
+#   1. No enviar logs duplicados tras un reinicio de Promtail.
+#   2. No perder logs que ocurrieron mientras Promtail estaba detenido.
+# Si se borra positions.yaml, Promtail releerá todos los logs desde el principio
+# y los enviará nuevamente a Loki (duplicados en el almacenamiento).
 promtail_positions_dir: "{{ data_base }}/promtail"
+
+# promtail_url: URL de descarga del binario desde los releases de Loki en GitHub.
+# Promtail se distribuye como archivo .zip en el repositorio de Loki (no tiene
+# repositorio propio). El binario resultante es 'promtail-linux-amd64'.
+# {{ promtail_version }} viene de group_vars/all.yaml y coincide con loki_version.
 promtail_url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"

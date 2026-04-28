@@ -1,10 +1,25 @@
+#SPDX-License-Identifier: MIT-0
 ---
+# Handlers del rol node_exporter.
+#
+# Los handlers se ejecutan UNA SOLA VEZ al final del play, solo si fueron
+# notificados por alguna tarea que introdujo un cambio (changed=true). Si el
+# binario Y el archivo de servicio cambian en la misma ejecución, node_exporter
+# se reinicia una sola vez al final — no dos veces.
+
+# reiniciar node_exporter: reinicio completo del proceso.
+# Se notifica cuando cambia el binario o el archivo de unidad systemd.
+# 'daemon_reload: true' garantiza que systemd lee el archivo .service actualizado
+# antes de reiniciar, en caso de que ambos cambios ocurran en la misma ejecución.
 - name: reiniciar node_exporter
   ansible.builtin.systemd:
     name: node_exporter
     state: restarted
     daemon_reload: true
 
+# recargar systemd: recarga los archivos de unidades sin reiniciar ningún servicio.
+# Se notifica cuando solo cambia el archivo .service (sin cambio de binario).
+# Equivale a 'systemctl daemon-reload'.
 - name: recargar systemd
   ansible.builtin.systemd:
     daemon_reload: true

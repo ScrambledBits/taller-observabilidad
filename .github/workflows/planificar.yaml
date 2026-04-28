@@ -1,0 +1,53 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Workflow manual para ejecutar terraform plan y revisar los cambios propuestos
+# ANTES de aplicarlos.
+#
+# PRERREQUISITO CRÍTICO: El stack de aplicaciones (taller-iac) DEBE estar desplegado
+# antes de ejecutar este workflow. terraform plan leerá el remote state de ese stack
+# para resolver vpc_id, subnet_id y security_group_ids. Sin ese estado, el plan
+# fallará con un error de data source ("data.terraform_remote_state.apps").
+#
+# CÓMO EJECUTAR:
+#   GitHub → Actions → "Planificar infraestructura" → Run workflow → escribir "planificar"
+
+name: Planificar infraestructura
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacion:
+        description: 'Escribe "planificar" para ejecutar terraform plan'
+        required: true
+
+jobs:
+  planificar:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event.inputs.confirmacion == 'planificar'
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.9"
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Plan
+        run: terraform plan -no-color -input=false

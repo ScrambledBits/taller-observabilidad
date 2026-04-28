@@ -1,3 +1,4 @@
+#SPDX-License-Identifier: MIT-0
 ---
 # Rol "common": configuración base del servidor que todos los demás roles necesitan.
 # Este rol corre primero (ver ansible/site.yaml) porque los demás dependen de:
@@ -18,11 +19,11 @@
 #   - upgrade: no elimina paquetes ni agrega nuevos para resolver dependencias
 #   - dist-upgrade: puede eliminar paquetes obsoletos y agregar nuevas dependencias
 # En un servidor nuevo (como este EC2 recién lanzado), es la opción recomendada.
-# register: guarda el resultado en la variable "resultado_upgrade" para usarla después.
+# register: guarda el resultado en la variable "common_resultado_upgrade" para usarla después.
 - name: Actualizar todos los paquetes del sistema
   ansible.builtin.apt:
     upgrade: dist
-  register: resultado_upgrade
+  register: common_resultado_upgrade
 
 # Paquetes necesarios para los roles siguientes:
 #   - curl, wget: descargar binarios de GitHub
@@ -79,7 +80,7 @@
 #   - promtail no puede leer el journal para enviar logs a Loki
 # Hacemos esto en "common" (antes de instalar esos roles) para que cuando
 # node_exporter y promtail arranquen, el usuario ya tenga el acceso necesario.
-- name: Agregar usuario {{ observability_user }} al grupo systemd-journal
+- name: Agregar usuario al grupo systemd-journal — {{ observability_user }}
   ansible.builtin.user:
     name: "{{ observability_user }}"
     groups: systemd-journal
@@ -90,9 +91,9 @@
 # después de reiniciar. Los servicios que arranquen antes del reinicio seguirían
 # usando el kernel anterior, lo que podría causar inconsistencias.
 # La condición evalúa:
-#   1. resultado_upgrade.changed → hubo actualizaciones
+#   1. common_resultado_upgrade.changed → hubo actualizaciones
 #   2. 'linux-image' in stdout → alguna de las actualizaciones fue un kernel
 - name: Reiniciar si se actualizó el kernel
   ansible.builtin.reboot:
     reboot_timeout: 120
-  when: resultado_upgrade.changed and 'linux-image' in (resultado_upgrade.stdout | default(''))
+  when: common_resultado_upgrade.changed and 'linux-image' in (common_resultado_upgrade.stdout | default(''))

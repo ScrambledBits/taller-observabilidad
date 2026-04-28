@@ -24,12 +24,14 @@ SHELL := bash
 TERRAFORM_DIR := terraform
 ANSIBLE_DIR   := ansible
 INVENTORY     := $(ANSIBLE_DIR)/inventario_terraform.yaml
+TFLINT_CONFIG  := terraform/.tflint.hcl
+CHECKOV_CONFIG := .checkov.yaml
 
 # .PHONY: declara que estos targets NO son nombres de archivos.
 # Sin .PHONY, si existiera un archivo llamado "inventario", make pensaría que el
 # target ya está "actualizado" y no ejecutaría el recipe.
 # Todos los targets que no generan un archivo con su propio nombre deben estar aquí.
-.PHONY: inventario ping provision open tf-destroy ayuda
+.PHONY: inventario ping provision open tf-destroy ayuda check lint-terraform scan-terraform lint-ansible install-tools
 
 ayuda: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS=":.*##"}; {printf "  %-15s %s\n", $$1, $$2}'
@@ -71,3 +73,52 @@ open: ## Abre Grafana, Prometheus y Alertmanager en el navegador
 tf-destroy: ## Destruye toda la infraestructura (¡ejecutar al finalizar el taller!)
 	@printf "⚠  Destruyendo infraestructura — se dejarán de consumir créditos AWS\n"
 	@cd $(TERRAFORM_DIR) && terraform destroy -auto-approve
+
+# ── Targets de calidad de código y seguridad ─────────────────────────────────
+# Estos targets son adicionales a los del taller (inventario, provision, etc.).
+# Uso típico: correr 'make check' antes de hacer 'git push'.
+
+# check: corre todos los checks de calidad en secuencia.
+# Si cualquier check falla, Make se detiene. Correr antes de 'git push'.
+check: lint-terraform scan-terraform lint-ansible ## Corre todos los checks de linting y seguridad
+	@printf ">>> Todos los checks pasaron.\n"
+
+# lint-terraform: valida formato, sintaxis y estilo del código Terraform.
+# Usa -backend=false para no requerir credenciales AWS ni el estado remoto.
+lint-terraform: ## Lint de Terraform (fmt, validate, tflint)
+	@printf ">>> terraform fmt\n"
+	terraform -chdir=$(TERRAFORM_DIR) fmt -check -recursive
+	@printf ">>> terraform init (sin backend)\n"
+	terraform -chdir=$(TERRAFORM_DIR) init -backend=false -input=false -reconfigure
+	@printf ">>> terraform validate\n"
+	terraform -chdir=$(TERRAFORM_DIR) validate -no-color
+	@printf ">>> tflint init\n"
+	tflint --config=.tflint.hcl --chdir=$(TERRAFORM_DIR) --init
+	@printf ">>> tflint run\n"
+	tflint --config=.tflint.hcl --chdir=$(TERRAFORM_DIR) -f compact
+
+# scan-terraform: escanea el código Terraform buscando configuraciones inseguras.
+scan-terraform: ## Escaneo de seguridad de Terraform con Checkov
+	@printf ">>> checkov\n"
+	checkov --config-file $(CHECKOV_CONFIG)
+
+# lint-ansible: valida los playbooks y roles de Ansible.
+lint-ansible: ## Lint de Ansible con ansible-lint
+	@printf ">>> ansible-lint\n"
+	ansible-lint $(ANSIBLE_DIR)/site.yaml
+
+# install-tools: verifica que todas las herramientas necesarias estén instaladas.
+# Correr una vez al configurar el entorno de desarrollo.
+install-tools: ## Verifica herramientas requeridas para el pipeline CI/CD
+	@printf "\nHerramientas requeridas para el pipeline CI/CD:\n"
+	@printf "  terraform   : IaC (mise use terraform@1.14.9)\n"
+	@printf "  tflint      : linter de Terraform (mise use tflint@0.61.0)\n"
+	@printf "  checkov     : escáner de seguridad IaC (brew install checkov)\n"
+	@printf "  ansible     : configuración de servidores (brew install ansible)\n"
+	@printf "  ansible-lint: linter de Ansible (brew install ansible-lint)\n\n"
+	@command -v terraform    >/dev/null 2>&1 || { printf "MISSING: terraform\n";    exit 1; }
+	@command -v tflint       >/dev/null 2>&1 || { printf "MISSING: tflint\n";       exit 1; }
+	@command -v checkov      >/dev/null 2>&1 || { printf "MISSING: checkov\n";      exit 1; }
+	@command -v ansible      >/dev/null 2>&1 || { printf "MISSING: ansible\n";      exit 1; }
+	@command -v ansible-lint >/dev/null 2>&1 || { printf "MISSING: ansible-lint\n"; exit 1; }
+	@printf "Todas las herramientas están instaladas.\n"

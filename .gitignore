@@ -124,3 +124,6 @@ CLAUDE.md
 
 # Inventario generado automáticamente por Terraform — no editar manualmente
 ansible/inventario_terraform.yaml
+
+# Estado de trabajo actual — no versionar
+TODO.md

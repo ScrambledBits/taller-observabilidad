@@ -6,12 +6,11 @@ After=network.target
 Type=simple
 User={{ alertmanager_user }}
 
+# --storage.path: directorio donde Alertmanager persiste silences (alertas silenciadas
+# manualmente desde la UI) y el notification log (historial de qué notificaciones se
+# enviaron y cuándo). Sin persistencia, cada reinicio olvidaría los silences activos.
 ExecStart={{ install_dir }}/alertmanager \
   --config.file={{ alertmanager_config_dir }}/alertmanager.yml \
-  # --storage.path: directorio donde Alertmanager persiste:
-  #   - silences: alertas que el operador silenció manualmente desde la UI
-  #   - nflog (notification log): historial de qué notificaciones se enviaron y cuándo
-  # Sin persistencia, cada reinicio de Alertmanager olvidaría los silences.
   --storage.path={{ alertmanager_data_dir }} \
   --web.listen-address=":{{ alertmanager_port }}"
 
