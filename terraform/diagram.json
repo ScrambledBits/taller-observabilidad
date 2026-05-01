@@ -1,0 +1,264 @@
+{
+  "diagram": {
+    "id": "8ae1bd8bf635",
+    "name": "Terraform Infrastructure",
+    "description": "",
+    "resources": [
+      {
+        "id": "aws_instance.monitoreo",
+        "name": "i-02cd3410a87491d39",
+        "type": "aws:ec2:instance",
+        "provider": "aws\"]",
+        "region": "us-east-1",
+        "account": "301820662531",
+        "state": "active",
+        "properties": {
+          "ami": "ami-05cf1e9f73fbad2e2",
+          "arn": "arn:aws:ec2:us-east-1:301820662531:instance/i-02cd3410a87491d39",
+          "associate_public_ip_address": true,
+          "availability_zone": "us-east-1a",
+          "capacity_reservation_specification": [
+            {
+              "capacity_reservation_preference": "open",
+              "capacity_reservation_target": []
+            }
+          ],
+          "cpu_options": [
+            {
+              "amd_sev_snp": "",
+              "core_count": 1,
+              "nested_virtualization": "",
+              "threads_per_core": 2
+            }
+          ],
+          "credit_specification": [
+            {
+              "cpu_credits": "unlimited"
+            }
+          ],
+          "disable_api_stop": false,
+          "disable_api_termination": false,
+          "ebs_block_device": [],
+          "ebs_optimized": false,
+          "enable_primary_ipv6": null,
+          "enclave_options": [
+            {
+              "enabled": false
+            }
+          ],
+          "ephemeral_block_device": [],
+          "force_destroy": false,
+          "get_password_data": false,
+          "hibernation": false,
+          "host_id": "",
+          "host_resource_group_arn": null,
+          "iam_instance_profile": "",
+          "id": "i-02cd3410a87491d39",
+          "instance_initiated_shutdown_behavior": "stop",
+          "instance_lifecycle": "",
+          "instance_market_options": [],
+          "instance_state": "running",
+          "instance_type": "t3.small",
+          "ipv6_address_count": 0,
+          "ipv6_addresses": [],
+          "key_name": "taller_observabilidad_bootcamperu_taller-observabilidad-bootcamperu.pem",
+          "launch_template": [],
+          "maintenance_options": [
+            {
+              "auto_recovery": "default"
+            }
+          ],
+          "metadata_options": [
+            {
+              "http_endpoint": "enabled",
+              "http_protocol_ipv6": "disabled",
+              "http_put_response_hop_limit": 2,
+              "http_tokens": "required",
+              "instance_metadata_tags": "disabled"
+            }
+          ],
+          "monitoring": false,
+          "network_interface": [],
+          "outpost_arn": "",
+          "password_data": "",
+          "placement_group": "",
+          "placement_group_id": "",
+          "placement_partition_number": 0,
+          "primary_network_interface": [
+            {
+              "delete_on_termination": true,
+              "network_interface_id": "eni-018bbdee0630b0ae9"
+            }
+          ],
+          "primary_network_interface_id": "eni-018bbdee0630b0ae9",
+          "private_dns": "ip-10-0-1-64.ec2.internal",
+          "private_dns_name_options": [
+            {
+              "enable_resource_name_dns_a_record": false,
+              "enable_resource_name_dns_aaaa_record": false,
+              "hostname_type": "ip-name"
+            }
+          ],
+          "private_ip": "10.0.1.64",
+          "public_dns": "",
+          "public_ip": "54.80.226.84",
+          "region": "us-east-1",
+          "root_block_device": [
+            {
+              "delete_on_termination": true,
+              "device_name": "/dev/sda1",
+              "encrypted": false,
+              "iops": 3000,
+              "kms_key_id": "",
+              "tags": {
+                "Environment": "dev",
+                "ManagedBy": "terraform",
+                "Owner": "Emilio Castro",
+                "Project": "taller-observabilidad-bootcamperu",
+                "Team": "DevOps"
+              },
+              "tags_all": {
+                "Environment": "dev",
+                "ManagedBy": "terraform",
+                "Owner": "Emilio Castro",
+                "Project": "taller-observabilidad-bootcamperu",
+                "Team": "DevOps"
+              },
+              "throughput": 125,
+              "volume_id": "vol-04e88a8c56b344c5a",
+              "volume_size": 8,
+              "volume_type": "gp3"
+            }
+          ],
+          "secondary_network_interface": [],
+          "secondary_private_ips": [],
+          "security_groups": [],
+          "source_dest_check": true,
+          "spot_instance_request_id": "",
+          "subnet_id": "subnet-0bd955e9e8feb6286",
+          "tags": {
+            "Name": "Instancia Monitoreo"
+          },
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform",
+            "Name": "Instancia Monitoreo",
+            "Owner": "Emilio Castro",
+            "Project": "taller-observabilidad-bootcamperu",
+            "Team": "DevOps"
+          },
+          "tenancy": "default",
+          "timeouts": null,
+          "user_data": "#!/usr/bin/env bash\n# Punto de discusión pedagógica: estrategia de despliegue — Docker vs binarios nativos.\n#\n# CONTEXTO: Este script se ejecuta UNA SOLA VEZ al lanzar la instancia EC2.\n# Es el mecanismo \"user_data\" de cloud-init: AWS lo inyecta como metadato de la\n# instancia y el agente cloud-init lo ejecuta como root durante el primer arranque,\n# ANTES de que Ansible pueda conectarse.\n#\n# PROPÓSITO de este script: preparar el mínimo indispensable del SO para que\n# Ansible pueda correr. La instalación real de cada componente de observabilidad\n# la realizan los roles Ansible (más mantenibles, idempotentes, testeables).\n#\n# PUNTO DE DISCUSIÓN EN EL TALLER — dos estrategias válidas:\n#\n# ESTRATEGIA A — Binarios nativos (implementada en este taller):\n#   Cada componente (Prometheus, Grafana, Loki, etc.) se instala como binario\n#   del sistema operativo, gestionado directamente por systemd.\n#   Ventajas:\n#     - Sin overhead de runtime de contenedores\n#     - Integración nativa con systemd (journald, restart policies, etc.)\n#     - Depuración directa: los logs van a journald, los procesos son visibles en ps\n#     - Menos dependencias en la máquina (no necesita Docker)\n#   Desventajas:\n#     - Actualizar versiones requiere descargar y reemplazar binarios manualmente\n#     - Dependencias del sistema operativo pueden interferir entre componentes\n#\n# ESTRATEGIA B — Docker Compose:\n#   Cada componente corre en un contenedor; docker-compose.yml define el stack completo.\n#   Ventajas:\n#     - Aislamiento: cada componente tiene sus propias dependencias\n#     - Rollback sencillo: cambiar la versión en el compose y hacer `docker compose up`\n#     - Versiones fijas y reproducibles en el compose file\n#     - Portabilidad: el mismo compose funciona en dev y producción\n#   Desventajas:\n#     - Requiere instalar y gestionar el Docker daemon\n#     - Volúmenes y redes de Docker añaden complejidad al debugging\n#     - Mayor consumo de memoria por el overhead de los contenedores\n#\n# En proyectos reales ambas son válidas. La elección depende del equipo y la plataforma.\n\n# set -o errexit: el script aborta si cualquier comando retorna código != 0\n# set -o nounset: el script aborta si se usa una variable no definida (previene errores silenciosos)\n# set -o pipefail: el script aborta si falla cualquier comando en un pipe (sin esto, solo falla el último)\nset -o errexit -o nounset -o pipefail\n\n# Establece el hostname del servidor. Aparecerá en el prompt SSH y en los logs del sistema.\n# También es el nombre que Prometheus usará como etiqueta `instance` en algunas métricas.\nhostnamectl set-hostname monitoreo-bootcamperu\n\n# -qq: modo silencioso (quiet quiet) — suprime output no esencial de apt\napt-get update -qq\n\n# --no-install-recommends: instala solo las dependencias directas, no las \"recomendadas\".\n# Reduce el tamaño de la imagen y el tiempo de instalación en entornos de servidor.\napt-get install -y --no-install-recommends \\\n  curl \\\n  wget \\\n  unzip \\\n  python3 \\\n  apt-transport-https \\\n  ca-certificates \\\n  gnupg \\\n  software-properties-common\n\n# Crear un usuario de sistema dedicado para ejecutar los procesos de observabilidad.\n# Principio de mínimo privilegio: cada servicio corre con el usuario `observability`,\n# no como root. Si un servicio es comprometido, el atacante solo tiene acceso limitado.\n#\n# --system: UID \u003c 1000, sin directorio home por defecto, marcado como usuario de sistema\n# --no-create-home: no crea /home/observability (innecesario para un servicio)\n# --shell /usr/sbin/nologin: previene login interactivo con este usuario\n# 2\u003e/dev/null || true: ignora el error si el usuario ya existe (idempotencia)\nuseradd --system --no-create-home --shell /usr/sbin/nologin observability 2\u003e/dev/null || true\n",
+          "user_data_base64": null,
+          "user_data_replace_on_change": false,
+          "volume_tags": null,
+          "vpc_security_group_ids": [
+            "sg-0526211dbee61ebe2",
+            "sg-0c583a3c075ed5898",
+            "sg-0c877d3fe00b9f0d4"
+          ]
+        },
+        "tags": {
+          "Name": "Instancia Monitoreo"
+        },
+        "source": "terraform",
+        "icon_url": "/icons/Compute/EC2.svg",
+        "x": 0,
+        "y": 0,
+        "hidden": false
+      },
+      {
+        "id": "aws_security_group.taller_observabilidad_bootcamperu_prometheus",
+        "name": "taller_observabilidad_bootcamperu_publico",
+        "type": "aws:ec2:securitygroup",
+        "provider": "aws\"]",
+        "region": "us-east-1",
+        "account": "301820662531",
+        "state": "active",
+        "properties": {
+          "arn": "arn:aws:ec2:us-east-1:301820662531:security-group/sg-0526211dbee61ebe2",
+          "description": "SG del proyecto taller-observabilidad-bootcamperu",
+          "egress": [],
+          "id": "sg-0526211dbee61ebe2",
+          "ingress": [],
+          "name": "taller_observabilidad_bootcamperu_publico",
+          "name_prefix": "",
+          "owner_id": "301820662531",
+          "region": "us-east-1",
+          "revoke_rules_on_delete": false,
+          "tags": {
+            "Name": "taller_observabilidad_bootcamperu_prometheus"
+          },
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform",
+            "Name": "taller_observabilidad_bootcamperu_prometheus",
+            "Owner": "Emilio Castro",
+            "Project": "taller-observabilidad-bootcamperu",
+            "Team": "DevOps"
+          },
+          "timeouts": null,
+          "vpc_id": "vpc-0c1aa90a9bfb76ee1"
+        },
+        "tags": {
+          "Name": "taller_observabilidad_bootcamperu_prometheus"
+        },
+        "source": "terraform",
+        "icon_url": "/icons/Networking-Content-Delivery/Virtual-Private-Cloud.svg",
+        "x": 0,
+        "y": 0,
+        "hidden": false
+      }
+    ],
+    "connections": [
+      {
+        "id": "3349f0345910",
+        "source_id": "aws_instance.monitoreo",
+        "target_id": "aws_security_group.taller_observabilidad_bootcamperu_prometheus",
+        "type": "access",
+        "description": "EC2 instance uses security group",
+        "properties": {},
+        "bidirectional": false,
+        "hidden": false,
+        "color": "",
+        "style": ""
+      }
+    ],
+    "metadata": {
+      "serial": 5,
+      "state_version": 4,
+      "terraform_version": "1.14.8"
+    },
+    "created_at": "2026-04-30T22:54:37.051345-06:00",
+    "updated_at": "2026-04-30T22:54:37.051345-06:00",
+    "source": "terraform",
+    "version": "1.0"
+  },
+  "warnings": [
+    "Unsupported resource type: aws_key_pair",
+    "Unsupported resource type: aws_vpc_security_group_egress_rule",
+    "Unsupported resource type: aws_vpc_security_group_ingress_rule",
+    "Unsupported resource type: aws_vpc_security_group_ingress_rule",
+    "Unsupported resource type: aws_vpc_security_group_ingress_rule",
+    "Unsupported resource type: aws_vpc_security_group_ingress_rule",
+    "Unsupported resource type: local_file",
+    "Unsupported resource type: local_sensitive_file",
+    "Unsupported resource type: terraform_data",
+    "Unsupported resource type: terraform_data",
+    "Unsupported resource type: tls_private_key"
+  ],
+  "stats": {
+    "resource_count": 2,
+    "connection_count": 1,
+    "error_count": 0,
+    "warning_count": 11,
+    "scan_duration_ms": 0
+  },
+  "scan_time": "2026-04-30T22:54:37.05135-06:00",
+  "scan_config": {
+    "source": "terraform",
+    "input_path": "state.tfstate",
+    "include_all": false
+  }
+}
